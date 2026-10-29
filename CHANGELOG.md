@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.19 (versionCode 30)
+- First release with the `fdroid` build flavor: no Firebase/FCM, Google Play services, ML Kit or install referrer; QR pairing uses ZXing. The Play build is unchanged.
+- Source published at https://github.com/stellartimelock/stellartimelock-wallet (GPL-3.0-or-later).
+
 ## 1.6.18 (versionCode 29)
 - Removed Scopuly: the Home row, the Scopuly screen, its icon and badges, and the unused Scopuly SEP-7 vault handoff code. Tap-to-pay SEP-7 pay links are unchanged. No stored data or keys change.
 - Swap goes through the StellarTimeLock swap proxy (Cloudflare Worker, source in `proxy/`). The app no longer contains a SimpleSwap partner key.

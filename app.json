@@ -2,7 +2,7 @@
   "expo": {
     "name": "Stellar TimeLock",
     "slug": "wallet",
-    "version": "1.6.18",
+    "version": "1.6.19",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "stellartimelock",
@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.stellartimelock",
-      "versionCode": 29,
+      "versionCode": 30,
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
