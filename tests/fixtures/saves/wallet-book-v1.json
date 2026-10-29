@@ -1,0 +1,12 @@
+{
+  "activeId": "w_harbor",
+  "entries": [
+    {
+      "id": "w_harbor",
+      "label": "Harbor sample",
+      "publicKey": "GB6P6K3CFDBVJ2N6IYO526U33UTWRYJLSDYF2NJC54B3BGO46URROVJX",
+      "kind": "legacy",
+      "createdAt": 1700000000000
+    }
+  ]
+}

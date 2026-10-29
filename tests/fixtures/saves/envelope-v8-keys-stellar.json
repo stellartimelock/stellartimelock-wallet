@@ -1,0 +1,36 @@
+{
+  "v": 8,
+  "writtenAt": 1728000000000,
+  "device": "stellar-timelock-wallet",
+  "notes": [],
+  "bills": [],
+  "addresses": [
+    {
+      "id": "c_northwind",
+      "label": "Northwind Studio",
+      "publicKey": "GAWEHPRGF6VWNIZUR5NO7JR7DGRPX5PGZMX6HFJJI5AX3OWQ4VRJTK5C",
+      "defaultMemo": "",
+      "kind": "private",
+      "createdAt": 1728000000000
+    }
+  ],
+  "keyManager": [
+    {
+      "id": "km_old",
+      "label": "Old stellar key",
+      "secretSeed": "SAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "publicAddress": "GB6P6K3CFDBVJ2N6IYO526U33UTWRYJLSDYF2NJC54B3BGO46URROVJX",
+      "createdAt": 1728000000000
+    }
+  ],
+  "walletMeta": [
+    {
+      "id": "w_harbor",
+      "label": "Harbor sample",
+      "publicKey": "GB6P6K3CFDBVJ2N6IYO526U33UTWRYJLSDYF2NJC54B3BGO46URROVJX",
+      "kind": "legacy",
+      "createdAt": 1728000000000,
+      "updatedAt": 1728000001000
+    }
+  ]
+}

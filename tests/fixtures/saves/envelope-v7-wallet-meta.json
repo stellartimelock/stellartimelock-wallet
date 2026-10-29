@@ -1,0 +1,28 @@
+{
+  "v": 7,
+  "writtenAt": 1720000000000,
+  "device": "stellar-timelock-wallet",
+  "notes": [],
+  "bills": [],
+  "addresses": [
+    {
+      "id": "c_sam",
+      "label": "Sam Okonkwo",
+      "publicKey": "GD7TBA5EBJXZPZ3BRRY4LSWPKAYJBFRTMQ5R5PFEW3LQY627HMBCB6WL",
+      "defaultMemo": "",
+      "kind": "exchange",
+      "network": "stellar",
+      "createdAt": 1720000000000,
+      "updatedAt": 1720000005000
+    }
+  ],
+  "walletMeta": [
+    {
+      "id": "w_harbor",
+      "label": "Harbor sample",
+      "publicKey": "GB6P6K3CFDBVJ2N6IYO526U33UTWRYJLSDYF2NJC54B3BGO46URROVJX",
+      "kind": "imported",
+      "createdAt": 1720000000000
+    }
+  ]
+}

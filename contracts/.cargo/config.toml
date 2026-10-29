@@ -1,0 +1,7 @@
+# Do not set a default [build].target here — `cargo test` needs the host
+# triple (testutils is unsupported on wasm32). Pass --target explicitly for
+# WASM builds (see htlc/build.sh).
+
+[alias]
+# Build optimized WASM: `cargo build -p htlc --release --target wasm32-unknown-unknown`
+# Then optimize with stellar-cli (see README).

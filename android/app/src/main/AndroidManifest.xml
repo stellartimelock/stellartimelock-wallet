@@ -1,0 +1,178 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+  <!-- Libraries merge these in. This wallet has no push backend, no install
+       attribution, and no launcher badge. Local unlock reminders stay. -->
+  <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" tools:node="remove"/>
+  <uses-permission android:name="com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE" tools:node="remove"/>
+  <uses-permission android:name="com.sec.android.provider.badge.permission.READ" tools:node="remove"/>
+  <uses-permission android:name="com.sec.android.provider.badge.permission.WRITE" tools:node="remove"/>
+  <uses-permission android:name="com.htc.launcher.permission.READ_SETTINGS" tools:node="remove"/>
+  <uses-permission android:name="com.htc.launcher.permission.UPDATE_SHORTCUT" tools:node="remove"/>
+  <uses-permission android:name="com.sonyericsson.home.permission.BROADCAST_BADGE" tools:node="remove"/>
+  <uses-permission android:name="com.sonymobile.home.permission.PROVIDER_INSERT_BADGE" tools:node="remove"/>
+  <uses-permission android:name="com.anddoes.launcher.permission.UPDATE_COUNT" tools:node="remove"/>
+  <uses-permission android:name="com.majeur.launcher.permission.UPDATE_BADGE" tools:node="remove"/>
+  <uses-permission android:name="com.huawei.android.launcher.permission.CHANGE_BADGE" tools:node="remove"/>
+  <uses-permission android:name="com.huawei.android.launcher.permission.READ_SETTINGS" tools:node="remove"/>
+  <uses-permission android:name="com.huawei.android.launcher.permission.WRITE_SETTINGS" tools:node="remove"/>
+  <uses-permission android:name="android.permission.READ_APP_BADGE" tools:node="remove"/>
+  <uses-permission android:name="com.oppo.launcher.permission.READ_SETTINGS" tools:node="remove"/>
+  <uses-permission android:name="com.oppo.launcher.permission.WRITE_SETTINGS" tools:node="remove"/>
+  <uses-permission android:name="me.everything.badger.permission.BADGE_COUNT_READ" tools:node="remove"/>
+  <uses-permission android:name="me.everything.badger.permission.BADGE_COUNT_WRITE" tools:node="remove"/>
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" tools:replace="android:maxSdkVersion"/>
+  <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+  <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
+  <uses-permission android:name="android.permission.NFC"/>
+  <uses-permission android:name="android.permission.VIBRATE"/>
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" tools:replace="android:maxSdkVersion"/>
+  <permission
+    android:name="com.stellartimelock.wallet.permission.PICK_KEY"
+    android:protectionLevel="signature"
+    android:label="@string/pick_key_permission_label"
+    android:description="@string/pick_key_permission_description"/>
+  <uses-permission android:name="com.stellartimelock.wallet.permission.PICK_KEY"/>
+  <permission
+    android:name="com.stellartimelock.timelock.permission.TAP_PAY"
+    android:protectionLevel="signature"
+    android:label="@string/tap_pay_permission_label"
+    android:description="@string/tap_pay_permission_description"/>
+  <uses-permission android:name="com.stellartimelock.timelock.permission.TAP_PAY"/>
+  <uses-feature android:name="android.hardware.nfc" android:required="false"/>
+  <uses-feature android:name="android.hardware.nfc.hce" android:required="false"/>
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.VIEW"/>
+      <category android:name="android.intent.category.BROWSABLE"/>
+      <data android:scheme="https"/>
+    </intent>
+    <!-- See any launchable sibling so the confirm screen can show its name and icon. -->
+    <intent>
+      <action android:name="android.intent.action.MAIN"/>
+      <category android:name="android.intent.category.LAUNCHER"/>
+    </intent>
+  </queries>
+  <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="false" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false">
+    <receiver android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver" tools:node="remove"/>
+    <service android:name="com.google.firebase.messaging.FirebaseMessagingService" tools:node="remove"/>
+    <service android:name="expo.modules.notifications.service.ExpoFirebaseMessagingService" tools:node="remove"/>
+    <meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>
+    <meta-data android:name="expo.modules.updates.ENABLE_BSDIFF_PATCH_SUPPORT" android:value="true"/>
+    <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
+    <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
+    <provider
+      android:name="androidx.core.content.FileProvider"
+      android:authorities="${applicationId}.fileprovider"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/update_file_paths"/>
+    </provider>
+    <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize|assetsPaths" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="stellartimelock"/>
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="web+stellar"/>
+      </intent-filter>
+    </activity>
+    <activity
+      android:name=".keys.KeyPickerActivity"
+      android:exported="true"
+      android:excludeFromRecents="true"
+      android:permission="com.stellartimelock.wallet.permission.PICK_KEY"
+      android:screenOrientation="portrait"
+      android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode"
+      android:windowSoftInputMode="adjustResize"
+      android:theme="@style/AppTheme">
+      <intent-filter>
+        <action android:name="com.stellartimelock.wallet.action.PICK_KEY"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+    </activity>
+    <service
+      android:name=".keys.KeyPickerService"
+      android:exported="true"
+      android:permission="com.stellartimelock.wallet.permission.PICK_KEY">
+      <intent-filter>
+        <action android:name="com.stellartimelock.wallet.action.PICK_KEY"/>
+      </intent-filter>
+    </service>
+    <service
+      android:name=".tap.TapPayHceService"
+      android:exported="true"
+      android:permission="android.permission.BIND_NFC_SERVICE">
+      <intent-filter>
+        <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE"/>
+      </intent-filter>
+      <meta-data
+        android:name="android.nfc.cardemulation.host_apdu_service"
+        android:resource="@xml/tap_pay_apdu_service"/>
+    </service>
+    <activity
+      android:name=".tap.TapPayRequestActivity"
+      android:exported="true"
+      android:excludeFromRecents="true"
+      android:permission="com.stellartimelock.timelock.permission.TAP_PAY"
+      android:screenOrientation="portrait"
+      android:theme="@style/AppTheme">
+      <intent-filter>
+        <action android:name="com.stellartimelock.timelock.REQUEST_PAY"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+    </activity>
+    <activity
+      android:name=".tap.TapPayPayActivity"
+      android:exported="true"
+      android:excludeFromRecents="true"
+      android:permission="com.stellartimelock.timelock.permission.TAP_PAY"
+      android:screenOrientation="portrait"
+      android:theme="@style/AppTheme">
+      <intent-filter>
+        <action android:name="com.stellartimelock.timelock.PAY"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
+    </activity>
+    <service
+      android:name=".tiles.ReceiveTileService"
+      android:exported="true"
+      android:icon="@drawable/ic_qs_receive"
+      android:label="@string/qs_receive_xlm"
+      android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+      <intent-filter>
+        <action android:name="android.service.quicksettings.action.QS_TILE"/>
+      </intent-filter>
+    </service>
+    <service
+      android:name=".tiles.SendTileService"
+      android:exported="true"
+      android:icon="@drawable/ic_qs_send"
+      android:label="@string/qs_send_xlm"
+      android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+      <intent-filter>
+        <action android:name="android.service.quicksettings.action.QS_TILE"/>
+      </intent-filter>
+    </service>
+    <service
+      android:name=".tiles.BalanceTileService"
+      android:exported="true"
+      android:icon="@drawable/ic_qs_balance"
+      android:label="@string/qs_balance"
+      android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+      <intent-filter>
+        <action android:name="android.service.quicksettings.action.QS_TILE"/>
+      </intent-filter>
+    </service>
+  </application>
+</manifest>

@@ -1,0 +1,25 @@
+{
+  "v": 1,
+  "writtenAt": 1728000000000,
+  "limits": { "perPaymentXlm": "100", "dailyXlm": "500" },
+  "nonces": {},
+  "payments": [
+    {
+      "id": "p1",
+      "role": "request",
+      "network": "public",
+      "destination": "GB6P6K3CFDBVJ2N6IYO526U33UTWRYJLSDYF2NJC54B3BGO46URROVJX",
+      "source": "GAWEHPRGF6VWNIZUR5NO7JR7DGRPX5PGZMX6HFJJI5AX3OWQ4VRJTK5C",
+      "amount": "1.5",
+      "memo": "",
+      "chainMemo": "",
+      "hash": "abc",
+      "ledger": 1,
+      "createdAt": 1728000000000,
+      "name": "Harbor"
+    }
+  ],
+  "knownRecipients": ["GB6P6K3CFDBVJ2N6IYO526U33UTWRYJLSDYF2NJC54B3BGO46URROVJX"],
+  "whitelistedDestinations": [],
+  "requireOtpForNewAddresses": false
+}

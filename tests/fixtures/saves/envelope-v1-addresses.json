@@ -1,0 +1,17 @@
+{
+  "v": 1,
+  "writtenAt": 1700000000000,
+  "device": "stellar-timelock-wallet",
+  "notes": [],
+  "bills": [],
+  "addresses": [
+    {
+      "id": "c_northwind",
+      "label": "Northwind Studio",
+      "publicKey": "GAWEHPRGF6VWNIZUR5NO7JR7DGRPX5PGZMX6HFJJI5AX3OWQ4VRJTK5C",
+      "defaultMemo": "",
+      "kind": "private",
+      "createdAt": 1700000000000
+    }
+  ]
+}

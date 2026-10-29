@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- F-Droid flavor: drop the disabled Play services photo-picker backport stub (from expo-image-picker). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+  <application>
+    <service
+        android:name="com.google.android.gms.metadata.ModuleDependencies"
+        tools:node="remove" />
+  </application>
+</manifest>

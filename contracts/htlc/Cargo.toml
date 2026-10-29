@@ -1,0 +1,19 @@
+[package]
+name = "htlc"
+version = "1.0.0"
+edition = "2021"
+publish = false
+description = "Multi-vault Hash Time-Locked Contract (XLM) for Stellar TimeLock"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+
+[features]
+testutils = ["soroban-sdk/testutils"]

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  App-to-app data exchange for a Stellar payment request.
+  category is "other" on purpose. A "payment" group would register this
+  app as a card payment service and offer it as the default payment app.
+  There is no payment-network AID here.
+-->
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/tap_pay_hce_description"
+    android:requireDeviceUnlock="true">
+    <aid-group
+        android:description="@string/tap_pay_aid_description"
+        android:category="other">
+        <aid-filter android:name="F053544C50415901" />
+    </aid-group>
+</host-apdu-service>

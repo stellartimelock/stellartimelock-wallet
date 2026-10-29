@@ -1,0 +1,20 @@
+{
+  "v": 8,
+  "writtenAt": 1759700000000,
+  "device": "stellar-timelock-wallet",
+  "notes": [],
+  "bills": [],
+  "addresses": [],
+  "keyManager": [
+    {
+      "id": "km_sol",
+      "label": "Sol watch",
+      "chain": "sol",
+      "watchOnly": true,
+      "secretSeed": "",
+      "publicAddress": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+      "createdAt": 1759700000000,
+      "updatedAt": 1759700000000
+    }
+  ]
+}

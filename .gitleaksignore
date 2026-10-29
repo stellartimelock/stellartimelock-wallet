@@ -1,0 +1,6 @@
+# storage key names, not secrets
+src/legal/acceptance.ts:generic-api-key:4
+src/money/reminders.ts:generic-api-key:11
+src/notifications/index.ts:generic-api-key:22
+src/security/key-manager-access.ts:generic-api-key:20
+src/security/totp/store.ts:generic-api-key:16

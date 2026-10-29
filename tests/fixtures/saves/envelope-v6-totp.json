@@ -1,0 +1,28 @@
+{
+  "v": 6,
+  "writtenAt": 1710000000000,
+  "device": "stellar-timelock-wallet",
+  "notes": [],
+  "bills": [{ "id": "stub-only", "createdAt": 1710000000000 }],
+  "addresses": [
+    {
+      "id": "c_alex",
+      "label": "Alex Rivera",
+      "publicKey": "GAP7KCHNWMPVRWOFITQNRNV6BN3XODNS5YQSKLG6S4EYSEZ3544BIB3C",
+      "defaultMemo": "rent",
+      "kind": "private",
+      "createdAt": 1710000000000
+    }
+  ],
+  "totp": [
+    {
+      "id": "t_mail",
+      "name": "Mail",
+      "issuer": "Example",
+      "secret": "JBSWY3DPEHPK3PXP",
+      "isDefault": true,
+      "createdAt": 1710000000000,
+      "updatedAt": 1710000001000
+    }
+  ]
+}

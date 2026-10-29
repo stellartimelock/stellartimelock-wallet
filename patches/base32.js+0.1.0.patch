@@ -1,0 +1,13 @@
+diff --git a/node_modules/base32.js/index.js b/node_modules/base32.js/index.js
+index e380c16..c8f0f55 100644
+--- a/node_modules/base32.js/index.js
++++ b/node_modules/base32.js/index.js
+@@ -8,7 +8,7 @@ var base32 = require("./base32");
+ var finalizeDecode = base32.Decoder.prototype.finalize;
+ base32.Decoder.prototype.finalize = function (buf) {
+   var bytes = finalizeDecode.call(this, buf);
+-  return new Buffer(bytes);
++  return Buffer.from(bytes);
+ };
+ 
+ 

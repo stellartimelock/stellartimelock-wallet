@@ -1,0 +1,278 @@
+# Builds a debug-signed APK for this repo and publishes it to a GitHub Release.
+# - manual runs only (workflow_dispatch, optionally for any branch via the "branch" input).
+# - Signs with the project's existing signing keystore (repo secret) so CI APKs install
+#   over the apps already on the phone. The keystore is never committed.
+# - Release tag: latest-<branch>  (main = normal release, manual branch runs = prerelease)
+# - Asset name: <App>-<versionName>-<branch>.apk
+name: Android APK
+
+on:
+  # MANUAL ONLY (Actions tab -> Run workflow, or: gh workflow run android-apk.yml -R stellartimelock/<REPO>).
+  # Day-to-day builds happen on the PC (pc-build/build-apk.sh) to save Actions minutes.
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build (blank = the branch you run this from)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ inputs.branch || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  BRANCH: ${{ inputs.branch || github.ref_name }}
+  ANDROID_USER_HOME: /home/runner/.android
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.sha }}
+
+      - name: Free runner disk space
+        # React Native/Expo debug builds ran the hosted runner out of disk ("No space left on device")
+        # during assembleDebug. Drop preinstalled toolchains this build never uses (Android SDK/NDK kept).
+        shell: bash
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/share/swift /usr/local/share/boost \
+            /opt/hostedtoolcache/CodeQL /opt/hostedtoolcache/go /opt/hostedtoolcache/PyPy /usr/local/julia* \
+            /usr/local/share/powershell /usr/share/miniconda /opt/az /usr/local/lib/node_modules/@angular || true
+          sudo docker image prune --all --force >/dev/null 2>&1 || true
+          df -h /
+
+      - name: Detect Android project
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+          GRADLE_DIR=""
+          for d in . android; do
+            if [ -f "$d/gradlew" ] && ls "$d"/settings.gradle* >/dev/null 2>&1; then GRADLE_DIR="$d"; break; fi
+          done
+          if [ -z "$GRADLE_DIR" ]; then
+            f=$(find . -maxdepth 3 -name gradlew -not -path '*/node_modules/*' | head -1 || true)
+            [ -n "$f" ] && GRADLE_DIR=$(dirname "$f")
+          fi
+          IS_RN=false; IS_EXPO=false; PREBUILD=false
+          if [ -f package.json ]; then
+            grep -q '"react-native"' package.json && IS_RN=true
+            grep -q '"expo"' package.json && IS_EXPO=true
+          fi
+          if [ -z "$GRADLE_DIR" ] && [ "$IS_EXPO" = true ]; then
+            PREBUILD=true; IS_RN=true; GRADLE_DIR=android
+          fi
+          if [ -z "$GRADLE_DIR" ]; then
+            echo "::notice::No Android project on '$BRANCH' yet (no gradlew / Expo app). Skipping build."
+            echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          APP_DIR="$GRADLE_DIR/app"
+          [ -d "$APP_DIR" ] || APP_DIR=$(dirname "$(grep -l 'com.android.application' "$GRADLE_DIR"/*/build.gradle* | head -1 || true)")
+          SAFE_BRANCH=$(echo "$BRANCH" | sed 's/[^A-Za-z0-9._-]/-/g')
+          APP_NAME="${GITHUB_REPOSITORY#*/}"
+          {
+            echo "skip=false"; echo "gradle_dir=$GRADLE_DIR"; echo "app_dir=$APP_DIR"
+            echo "rn=$IS_RN"; echo "expo=$IS_EXPO"; echo "prebuild=$PREBUILD"
+            echo "safe_branch=$SAFE_BRANCH"; echo "app_name=$APP_NAME"
+          } >> "$GITHUB_OUTPUT"
+          echo "gradle_dir=$GRADLE_DIR app_dir=$APP_DIR rn=$IS_RN expo=$IS_EXPO prebuild=$PREBUILD branch=$SAFE_BRANCH"
+
+      - name: Require signing secret
+        if: steps.detect.outputs.skip == 'false'
+        shell: bash
+        env:
+          KS_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KS_B64" ]; then
+            echo "::error::Secret ANDROID_DEBUG_KEYSTORE_B64 is not set. Refusing to build an APK that would not install over the phone's existing app."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        if: steps.detect.outputs.skip == 'false'
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        if: steps.detect.outputs.skip == 'false'
+        with:
+          # v3's old default also installs the removed 'tools' package, which makes sdkmanager fail.
+          packages: 'platform-tools'
+          log-accepted-android-sdk-licenses: false
+
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.detect.outputs.skip == 'false'
+
+      - uses: actions/setup-node@v4
+        if: steps.detect.outputs.skip == 'false' && steps.detect.outputs.rn == 'true'
+        with:
+          node-version: '22'
+
+      - name: Cache npm
+        if: steps.detect.outputs.skip == 'false' && steps.detect.outputs.rn == 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: npm-${{ runner.os }}-${{ hashFiles('**/package-lock.json', '!**/node_modules/**') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      - name: Install JS dependencies
+        if: steps.detect.outputs.skip == 'false' && steps.detect.outputs.rn == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # postinstall-postinstall uses yarn whenever `yarnpkg` exists (it does on runners) even in npm
+          # projects, which breaks patch-package mid-install. Hide yarn for npm installs (matches local PC).
+          mkdir -p "$RUNNER_TEMP/noyarn"; printf '#!/bin/sh\nexit 1\n' > "$RUNNER_TEMP/noyarn/yarnpkg"; chmod +x "$RUNNER_TEMP/noyarn/yarnpkg"
+          # patch-package exits 1 on any unapplied/stale patch only when CI is set; locally it just warns.
+          # CI=false (ci-info opt-out) for the install so it behaves like the local PC build.
+          if [ -f package-lock.json ]; then CI=false PATH="$RUNNER_TEMP/noyarn:$PATH" npm ci --no-audit --no-fund
+          elif [ -f yarn.lock ]; then corepack enable && yarn install --frozen-lockfile
+          elif [ -f pnpm-lock.yaml ]; then corepack enable && pnpm install --frozen-lockfile
+          else npm install --no-audit --no-fund; fi
+
+      - name: Expo prebuild (managed Expo app without android/)
+        if: steps.detect.outputs.skip == 'false' && steps.detect.outputs.prebuild == 'true'
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Install signing keystore (from secret, never committed)
+        if: steps.detect.outputs.skip == 'false'
+        shell: bash
+        env:
+          KS_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_DEBUG_KEYSTORE_PASSWORD || 'android' }}
+          KEY_ALIAS: ${{ secrets.ANDROID_DEBUG_KEY_ALIAS || 'androiddebugkey' }}
+          EXPECTED_SHA256: ${{ secrets.ANDROID_SIGNING_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.android
+          echo "$KS_B64" | base64 -d > ~/.android/debug.keystore
+          # Android Gradle Plugin's default debug signing and the RN/Expo template
+          # (android/app/debug.keystore) both expect alias androiddebugkey / password android.
+          if [ "$KS_PASS" != "android" ] || [ "$KEY_ALIAS" != "androiddebugkey" ]; then
+            echo "::error::Keystore must use alias androiddebugkey and password android (AGP debug default)."; exit 1
+          fi
+          KS_SHA=$(keytool -list -v -keystore ~/.android/debug.keystore -storepass "$KS_PASS" -alias "$KEY_ALIAS" \
+                   | awk -F': ' '/SHA256:/ && !f {print $2; f=1}' | tr -d ': ' | tr 'A-F' 'a-f')
+          echo "Keystore cert SHA-256: $KS_SHA"
+          if [ -n "$EXPECTED_SHA256" ] && [ "$KS_SHA" != "$(echo "$EXPECTED_SHA256" | tr -d ': ' | tr 'A-F' 'a-f')" ]; then
+            echo "::error::Keystore secret does not match ANDROID_SIGNING_CERT_SHA256"; exit 1
+          fi
+          echo "KS_SHA=$KS_SHA" >> "$GITHUB_ENV"
+          # RN/Expo projects sign debug builds with app/debug.keystore; overwrite it in the CI workspace only.
+          if grep -qs "debug.keystore" "${{ steps.detect.outputs.app_dir }}"/build.gradle*; then
+            cp ~/.android/debug.keystore "${{ steps.detect.outputs.app_dir }}/debug.keystore"
+          fi
+
+      - name: Embed JS bundle (React Native / Expo)
+        if: steps.detect.outputs.skip == 'false' && steps.detect.outputs.rn == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_DIR="${{ steps.detect.outputs.app_dir }}"
+          mkdir -p "$APP_DIR/src/main/assets" "$APP_DIR/src/main/res"
+          if [ "${{ steps.detect.outputs.expo }}" = "true" ]; then
+            ENTRY=$(node -e "require('expo/scripts/resolveAppEntry')" "$PWD" android absolute)
+            npx expo export:embed --platform android --dev false --entry-file "$ENTRY" \
+              --bundle-output "$APP_DIR/src/main/assets/index.android.bundle" \
+              --assets-dest "$APP_DIR/src/main/res"
+          else
+            ENTRY=index.js; [ -f index.android.js ] && ENTRY=index.android.js
+            npx react-native bundle --platform android --dev false --entry-file "$ENTRY" \
+              --bundle-output "$APP_DIR/src/main/assets/index.android.bundle" \
+              --assets-dest "$APP_DIR/src/main/res"
+          fi
+          ls -la "$APP_DIR/src/main/assets/index.android.bundle"
+
+      - name: Clean build (assembleDebug)
+        if: steps.detect.outputs.skip == 'false'
+        shell: bash
+        working-directory: ${{ steps.detect.outputs.gradle_dir }}
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          EXTRA=""
+          # Phone is arm64; skip other ABIs to keep RN native builds fast.
+          [ "${{ steps.detect.outputs.rn }}" = "true" ] && EXTRA="-PreactNativeArchitectures=arm64-v8a"
+          # Sign explicitly with the secret keystore (AGP otherwise may use/generate a different debug key).
+          # Store flavors (play/fdroid): build the Play flavor here.
+          TASK=assembleDebug
+          grep -qs 'productFlavors' "${{ steps.detect.outputs.app_dir }}"/build.gradle* && TASK=assemblePlayDebug
+          ./gradlew --no-daemon clean $TASK $EXTRA \
+            -Pandroid.injected.signing.store.file="$HOME/.android/debug.keystore" \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=androiddebugkey \
+            -Pandroid.injected.signing.key.password=android
+
+      - name: Verify APK (bundle, signature) and name it
+        if: steps.detect.outputs.skip == 'false'
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_DIR="${{ steps.detect.outputs.app_dir }}"
+          APK=$(ls "$APP_DIR"/build/outputs/apk/debug/*.apk "$APP_DIR"/build/outputs/apk/play/debug/*.apk 2>/dev/null | head -1 || true)
+          [ -n "$APK" ] || APK=$(find "${{ steps.detect.outputs.gradle_dir }}" \( -path '*/build/outputs/apk/debug/*.apk' -o -path '*/build/outputs/apk/play/debug/*.apk' \) | head -1)
+          [ -n "$APK" ] || { echo "::error::No debug APK produced"; exit 1; }
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)"
+          echo "build-tools: $BT"
+          if [ "${{ steps.detect.outputs.rn }}" = "true" ]; then
+            LISTING=$(unzip -l "$APK")
+            grep -q 'assets/index.android.bundle' <<<"$LISTING" \
+              || { echo "::error::assets/index.android.bundle missing from APK"; exit 1; }
+            echo "JS bundle present."
+          fi
+          SIGOUT=$("$BT/apksigner" verify --verbose --print-certs "$APK" 2>&1 || true)
+          CERT=$(awk '/certificate SHA-256 digest/ && !f {print $NF; f=1}' <<<"$SIGOUT" | tr -d ': ' | tr 'A-F' 'a-f')
+          echo "APK signer SHA-256: $CERT"
+          [ -n "$CERT" ] || { echo "$SIGOUT"; echo "::error::Could not read APK signer"; exit 1; }
+          [ "$CERT" = "$KS_SHA" ] || { echo "::error::APK not signed with the expected keystore ($KS_SHA)"; exit 1; }
+          BADGING=$("$BT/aapt2" dump badging "$APK")
+          VERSION=$(echo "$BADGING" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -1)
+          VCODE=$(echo "$BADGING" | sed -n "s/.*versionCode='\([^']*\)'.*/\1/p" | head -1)
+          PKG=$(echo "$BADGING" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -1)
+          NAME="${{ steps.detect.outputs.app_name }}-${VERSION:-0}-${{ steps.detect.outputs.safe_branch }}.apk"
+          mkdir -p out && cp "$APK" "out/$NAME"
+          {
+            echo "path=out/$NAME"; echo "name=$NAME"; echo "version=${VERSION:-0}"
+            echo "vcode=${VCODE:-0}"; echo "pkg=$PKG"; echo "cert=$CERT"
+          } >> "$GITHUB_OUTPUT"
+          echo "### $NAME" >> "$GITHUB_STEP_SUMMARY"
+          echo "package \`$PKG\` versionName $VERSION (code $VCODE), signer SHA-256 \`$CERT\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.detect.outputs.skip == 'false'
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 7
+
+      - name: Publish GitHub Release latest-${{ steps.detect.outputs.safe_branch }}
+        if: steps.detect.outputs.skip == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="latest-${{ steps.detect.outputs.safe_branch }}"
+          SHA=$(git rev-parse HEAD)
+          # Fresh release each build so the date/title change (Obtainium sees it as an update).
+          gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+          FLAGS="--prerelease --latest=false"
+          if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then FLAGS="--latest"; fi
+          TITLE="${{ steps.apk.outputs.version }}-${{ steps.detect.outputs.safe_branch }}.${{ github.run_number }}"
+          NOTES="${{ steps.detect.outputs.app_name }} ${{ steps.apk.outputs.version }} (versionCode ${{ steps.apk.outputs.vcode }}) from branch \`$BRANCH\` @ ${SHA:0:7}
+          Package: ${{ steps.apk.outputs.pkg }}
+          Signer SHA-256: ${{ steps.apk.outputs.cert }}
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh release create "$TAG" "${{ steps.apk.outputs.path }}" --target "$SHA" --title "$TITLE" --notes "$NOTES" $FLAGS

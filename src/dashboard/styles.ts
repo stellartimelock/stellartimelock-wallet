@@ -1,0 +1,473 @@
+import { StyleSheet } from "react-native";
+import { colors, radii, spacing, tileShadow, typography } from "@/src/theme";
+import { shadow } from "@/src/theme/shadow";
+import type { Vault } from "@/src/api/client";
+
+export const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
+  header: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  headerTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerTitle: {
+    color: colors.text,
+    fontSize: 24,
+    ...typography.heading,
+    marginTop: 2,
+  },
+  eyebrow: { color: colors.textTertiary, fontSize: 10, ...typography.label },
+  address: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 4,
+    lineHeight: 17,
+  },
+  headerIcons: { flexDirection: "row", gap: 8, marginTop: 4 },
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+  },
+  newVaultRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    borderBottomColor: colors.borderSubtle,
+    borderBottomWidth: 1,
+  },
+  newVaultBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 48,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: radii.pill,
+    backgroundColor: colors.cyanMuted,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.cyan,
+    ...shadow({ color: colors.cyan, opacity: 0.35, radius: 10, offsetY: 4, elevation: 6 }),
+  },
+  newVaultBtnText: {
+    color: colors.textInverse,
+    fontWeight: "800",
+    fontSize: 16,
+    letterSpacing: 0.2,
+  },
+  newVaultHistoryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    minHeight: 48,
+    paddingHorizontal: 16,
+    borderRadius: radii.pill,
+    backgroundColor: "transparent",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.cyan,
+  },
+  newVaultHistoryBtnText: {
+    color: colors.cyan,
+    fontWeight: "800",
+    fontSize: 13,
+    letterSpacing: 0.2,
+  },
+  fabLegacyHidden: {
+    position: "absolute",
+    top: -1000,
+    left: -1000,
+    width: 1,
+    height: 1,
+    opacity: 0,
+  },
+  balanceChip: {
+    backgroundColor: colors.surfaceFrost,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md - 2,
+    paddingVertical: 8,
+    alignItems: "flex-end",
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    ...tileShadow(),
+  },
+  balanceLabel: { color: colors.textTertiary, fontSize: 9, ...typography.label },
+  balanceValue: { color: colors.text, fontSize: 13, fontWeight: "700", ...typography.mono },
+  balanceFiat: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
+
+  headerActions: {
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 6,
+  },
+  headerActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: radii.pill,
+    backgroundColor: colors.cyanMuted,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.cyan,
+    minHeight: 36,
+  },
+  headerActionText: { color: colors.cyan, fontSize: 11, fontWeight: "700" },
+
+  feeStrip: {
+    flexDirection: "row",
+    paddingHorizontal: spacing.md,
+    paddingTop: 8,
+  },
+
+  body: { padding: spacing.md, paddingTop: spacing.md },
+  sectionTitle: { color: colors.textSecondary, fontSize: 12, ...typography.label, marginBottom: spacing.sm },
+  footerEyebrow: {
+    color: colors.textTertiary,
+    fontSize: 10,
+    ...typography.label,
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+  },
+  onboardCard: { gap: spacing.sm + 4 },
+  onboardRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  onboardIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: radii.sm,
+    backgroundColor: colors.tealMuted,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  onboardTitle: { color: colors.text, fontSize: 13, fontWeight: "700" },
+  onboardBody: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  contractRuleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingVertical: 4,
+  },
+  contractRuleText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 17,
+    flex: 1,
+  },
+  advancedBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    marginTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle,
+  },
+  advancedBtnText: { color: colors.cyan, fontSize: 12, fontWeight: "700" },
+
+  sortRow: { marginTop: spacing.sm },
+  sortLabel: {
+    color: colors.textTertiary,
+    fontSize: 10,
+    ...typography.label,
+    marginBottom: 6,
+  },
+  sortChipRow: { gap: 8, paddingVertical: 2, paddingRight: spacing.md },
+  sortChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexShrink: 0,
+    height: 36,
+  },
+  sortChipActive: { backgroundColor: colors.cyanMuted, borderColor: colors.cyan },
+  sortChipText: { color: colors.text, fontSize: 12, fontWeight: "600" },
+  sortChipTextActive: { color: colors.cyan },
+
+  syncBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 4,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  syncBadgeText: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  syncBadgeHint: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    opacity: 0.7,
+  },
+
+  marketCredit: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    flexWrap: "wrap",
+  },
+  marketCreditText: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  marketCreditHint: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    opacity: 0.7,
+  },
+
+  heroCard: {
+    backgroundColor: colors.surfaceFrost,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    ...tileShadow(),
+  },
+  heroLabel: { color: colors.textTertiary, fontSize: 11, ...typography.label, marginBottom: 4 },
+  heroValue: { color: colors.text, fontSize: 30, ...typography.display, ...typography.mono },
+  heroFiat: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
+
+  spendableCard: {
+    backgroundColor: colors.tealMuted,
+    borderWidth: 1,
+    borderColor: colors.teal,
+    marginBottom: spacing.lg,
+  },
+  spendableEyebrow: {
+    color: colors.teal,
+    fontSize: 11,
+    ...typography.label,
+    marginBottom: 4,
+  },
+  spendableValue: {
+    color: colors.text,
+    fontSize: 32,
+    ...typography.display,
+    ...typography.mono,
+  },
+  spendableFiat: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
+  spendableHint: { color: colors.textSecondary, fontSize: 12, marginTop: 4 },
+  spendableDivider: {
+    height: 1,
+    backgroundColor: colors.teal,
+    opacity: 0.25,
+    marginVertical: spacing.md,
+  },
+  spendableRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 3,
+  },
+  spendableRowLabel: { color: colors.textSecondary, fontSize: 12 },
+  spendableRowValue: { color: colors.text, fontSize: 12, ...typography.mono },
+
+  divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.md },
+
+  statsRow: { flexDirection: "row", gap: 12 },
+  stat: { flex: 1 },
+  statLabel: { color: colors.textTertiary, fontSize: 10, ...typography.label, marginBottom: 4 },
+  statValue: { color: colors.text, fontSize: 15, fontWeight: "700", ...typography.mono },
+
+  vaultName: { color: colors.text, fontSize: 16, ...typography.heading },
+  vaultSub: { color: colors.textSecondary, fontSize: 12, marginTop: 4 },
+
+  rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+
+  statusText: { fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1 },
+
+  pillCol: {
+    alignItems: "flex-end",
+    gap: 4,
+  },
+  beneficiaryPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    backgroundColor: colors.goldMuted,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.gold,
+  },
+  beneficiaryPillText: {
+    color: colors.gold,
+    fontSize: 10,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  beneficiaryOwnerHint: {
+    color: colors.textTertiary,
+    fontSize: 11,
+    marginTop: 3,
+    ...typography.mono,
+  },
+
+  archivedPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceHighlight,
+  },
+  archivedPillText: {
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    color: colors.textTertiary,
+  },
+
+  wakeUpBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: spacing.md,
+    backgroundColor: colors.gold,
+    borderRadius: radii.md,
+    paddingVertical: 14,
+    minHeight: 44, // iOS HIG minimum touch target
+  },
+  wakeUpBtnText: {
+    color: colors.textInverse,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  archiveContainer: {
+    marginTop: spacing.lg,
+  },
+  archiveHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surfaceFrost,
+    borderRadius: radii.md,
+    minHeight: 44, // iOS HIG tap target
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+    ...tileShadow(),
+  },
+  archiveHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  archiveHeaderText: {
+    color: colors.textTertiary,
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  archiveBody: {
+    marginTop: spacing.md - 4,
+  },
+
+  balanceRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginTop: spacing.md,
+  },
+  vaultBalance: { color: colors.text, fontSize: 22, ...typography.display, ...typography.mono },
+  vaultFiat: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
+  targetCol: { alignItems: "flex-end" },
+  targetValue: { color: colors.text, fontSize: 13, ...typography.mono },
+
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.surfaceElevated,
+    marginTop: spacing.md,
+    overflow: "hidden",
+  },
+  progressFill: { height: 4, backgroundColor: colors.cyan },
+
+  empty: { alignItems: "center", paddingVertical: spacing.xxl, paddingHorizontal: spacing.lg },
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: colors.tealMuted,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.md,
+  },
+  emptyTitle: { color: colors.text, fontSize: 18, ...typography.heading, marginBottom: 6 },
+  emptyText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+
+  fab: {
+    display: "none",
+  },
+  fabText: { display: "none" },
+});
+
+export const statusPillStyle = (status: Vault["status"]) =>
+  ({
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+    backgroundColor:
+      status === "locked"
+        ? colors.tealMuted
+        : status === "unlocked"
+        ? colors.cyanMuted
+        : colors.surfaceHighlight,
+  } as const);

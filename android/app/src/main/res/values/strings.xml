@@ -1,0 +1,14 @@
+<resources>
+  <string name="app_name">Stellar TimeLock</string>
+  <string name="pick_key_permission_label">Pick a Stellar TimeLock key</string>
+  <string name="pick_key_permission_description">Allows an app signed with the same certificate to ask for a Key Manager seed to open its save file. The seed is returned in memory only and is not logged.</string>
+  <string name="qs_receive_xlm">Receive XLM</string>
+  <string name="qs_send_xlm">Send XLM</string>
+  <string name="qs_balance">Balance</string>
+  <string name="tap_pay_permission_label">Stellar TimeLock tap to pay</string>
+  <string name="tap_pay_permission_description">Allows an app signed with the same certificate to start an XLM payment or payment request. The person holding the phone still sees the full amount and recipient, then confirms with biometrics, before anything is signed.</string>
+  <string name="tap_pay_hce_description">Stellar TimeLock phone-to-phone payment request. This is an app-to-app data exchange, not a card payment.</string>
+  <string name="tap_pay_aid_description">Stellar TimeLock pay link</string>
+  <string name="expo_system_ui_user_interface_style" translatable="false">automatic</string>
+  <string name="expo_splash_screen_resize_mode" translatable="false">contain</string>
+</resources>

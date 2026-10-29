@@ -1,0 +1,12 @@
+{
+  "addresses": [
+    {
+      "id": "c_env",
+      "nickname": "Envelope friend",
+      "gAddress": "GDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "defaultMemo": "",
+      "kind": "mystery",
+      "createdAt": 1500000000000
+    }
+  ]
+}

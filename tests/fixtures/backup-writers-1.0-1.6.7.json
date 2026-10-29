@@ -1,0 +1,45 @@
+{
+  "plain": "{\"v\":1,\"hello\":\"world\"}",
+  "seed": "SSECRETSEEDFORTESTS",
+  "note": "Fixture password only. Not a wallet. iv bytes are 1..16. v3 salt bytes are 16..31.",
+  "writers": {
+    "export-1.0.0-through-1.6.3": {
+      "files": [
+        "documentDirectory/stellar-timelock-backup-<time>.stvault",
+        "From 1.6.1 the same wrapper is also copied to OS/StellarTimeLock/<stem>.os",
+        "Android SAF copy into the folder the user picked once (often named Stellar TimeLock or Downloads). Same bytes."
+      ],
+      "cipher": "v2",
+      "kdf": "CryptoJS.PBKDF2 with no hasher. crypto-js 4.2.0 defaults that to SHA-256, 10000 rounds, salts xlm_vault_notebook_v2_salt and xlm_vault_notebook_v2_mac_salt. HMAC-SHA256 over iv || ciphertext. Standard base64.",
+      "payload": "AQIDBAUGBwgJCgsMDQ4PEA==.oQAiKPX+hmeM3Lfoi/nRiJH7P57+sh76grSGuCbqxjI=.dyGPBTfrdF+VYKiugsf3Rn6fE3t5iErkfWplGicypK4="
+    },
+    "two-part-same-aes-key": {
+      "files": ["No export() in 1.0.0–1.6.7 wrote two parts. detectEncryptedFormat has accepted this shape since 1.0.0."],
+      "cipher": "v1",
+      "kdf": "Same AES key as export-1.0.0-through-1.6.3, no MAC.",
+      "payload": "AQIDBAUGBwgJCgsMDQ4PEA==.oQAiKPX+hmeM3Lfoi/nRiJH7P57+sh76grSGuCbqxjI="
+    },
+    "helper-sha1-v1": {
+      "files": ["encryptV1() in backup-crypto.ts since 1.6.4. export() does not call it. New files are v3."],
+      "cipher": "v1",
+      "kdf": "PBKDF2-SHA1, 10000 rounds, same fixed salts.",
+      "payload": "AQIDBAUGBwgJCgsMDQ4PEA==.ZMtP4Q2XbqLDAtQ241e6se8aCociM96+0CMdCKo9p88="
+    },
+    "helper-sha1-v2": {
+      "files": ["encryptV2() in backup-crypto.ts since 1.6.4. export() does not call it."],
+      "cipher": "v2",
+      "kdf": "PBKDF2-SHA1, 10000 rounds, same fixed salts, HMAC-SHA256 over iv || ciphertext.",
+      "payload": "AQIDBAUGBwgJCgsMDQ4PEA==.ZMtP4Q2XbqLDAtQ241e6se8aCociM96+0CMdCKo9p88=.r+9SROlE5rYsHkW7E9BDnKVc5SUk5rOSWmAQwpyKz1M="
+    },
+    "export-1.6.4-through-1.6.7": {
+      "files": [
+        "documentDirectory/stellar-timelock-backup-<time>.stvault",
+        "OS/StellarTimeLock/<stem>.os",
+        "Optional SAF copy of the same wrapper"
+      ],
+      "cipher": "v3",
+      "kdf": "PBKDF2-SHA256, 100000 rounds, random 16-byte salt, 64-byte key split into AES and HMAC.",
+      "payload": "v3.EBESExQVFhcYGRobHB0eHw==.AQIDBAUGBwgJCgsMDQ4PEA==.bIuO9FHiVUm65yOp+U0UXetXalC3gMAChgL0wYv53Rw=.RssAxyUJV9WZHgk8/JLPxPAbvV7eEL1CaWxjLgZH7Jo="
+    }
+  }
+}
