@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ToastProvider } from "@/src/components/Toast";
 import { TxReceiptBanner } from "@/src/components/TxReceiptBanner";
+import { VerifyTestnetBanner } from "@/src/components/VerifyTestnetBanner";
 import { SessionProvider } from "@/src/state/session";
 import { useIconFonts } from "@/src/hooks/use-icon-fonts";
 import { colors } from "@/src/theme";
@@ -95,6 +96,7 @@ export default function RootLayout() {
                 <TxReceiptBanner />
                 <UpdateBootstrap />
               </BiometricGate>
+              <VerifyTestnetBanner />
             </ToastProvider>
           </SessionProvider>
         </KeyboardProvider>

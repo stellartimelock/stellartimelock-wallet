@@ -1,7 +1,7 @@
 {
   "name": "wallet",
   "main": "./index.js",
-  "version": "1.6.19",
+  "version": "1.6.20",
   "license": "GPL-3.0-or-later",
   "scripts": {
     "postinstall": "patch-package",
@@ -10,7 +10,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "tsx --test src/money/*.test.ts src/tiers/permanent-elite.test.ts tests/favorites.test.ts tests/key-picker-contract.test.ts tests/quick-settings-tiles.test.ts tests/swap-routes.test.ts tests/swap-fee-tiers.test.ts tests/tap-pay-uri.test.ts tests/tap-pay-nonce.test.ts tests/tap-pay-limits.test.ts tests/tap-pay-tx.test.ts tests/tap-pay-history.test.ts tests/tap-pay-intent.test.ts tests/key-pairing-crypto.test.ts tests/derived-signing-key.test.ts tests/wallet-house-pass.test.ts tests/os-save.test.ts tests/legacy-save.test.ts tests/branding.test.ts tests/coming-soon.test.ts tests/ui-restore-160.test.ts tests/save-compat.test.ts tests/scopuly-sep7.test.ts tests/security-review.test.ts tests/save-formats.test.ts tests/key-manager-at-rest.test.ts tests/first-start-166.test.ts tests/restore-167.test.ts tests/restore-168.test.ts tests/vault-list-offline.test.ts tests/smart-address-book-169.test.ts tests/lock-minimum.test.ts tests/legacy-seed-slot.test.ts tests/swap-auto-send-memo.test.ts tests/send-choice-visible-1616.test.ts tests/unlock-fallback-1617.test.ts tests/fdroid-flavor.test.ts",
+    "test": "tsx --test src/money/*.test.ts src/tiers/permanent-elite.test.ts tests/favorites.test.ts tests/key-picker-contract.test.ts tests/quick-settings-tiles.test.ts tests/swap-routes.test.ts tests/swap-fee-tiers.test.ts tests/tap-pay-uri.test.ts tests/tap-pay-nonce.test.ts tests/tap-pay-limits.test.ts tests/tap-pay-tx.test.ts tests/tap-pay-history.test.ts tests/tap-pay-intent.test.ts tests/key-pairing-crypto.test.ts tests/derived-signing-key.test.ts tests/wallet-house-pass.test.ts tests/os-save.test.ts tests/legacy-save.test.ts tests/branding.test.ts tests/coming-soon.test.ts tests/ui-restore-160.test.ts tests/save-compat.test.ts tests/scopuly-sep7.test.ts tests/security-review.test.ts tests/save-formats.test.ts tests/key-manager-at-rest.test.ts tests/first-start-166.test.ts tests/restore-167.test.ts tests/restore-168.test.ts tests/vault-list-offline.test.ts tests/smart-address-book-169.test.ts tests/lock-minimum.test.ts tests/legacy-seed-slot.test.ts tests/swap-auto-send-memo.test.ts tests/send-choice-visible-1616.test.ts tests/unlock-fallback-1617.test.ts tests/fdroid-flavor.test.ts tests/verify-testnet-build.test.ts",
     "build": "expo export --platform web --output-dir dist-build-check"
   },
   "dependencies": {

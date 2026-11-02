@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only used when EXPO_PUBLIC_STL_VERIFY_TESTNET=1 (see android/app/build.gradle). -->
+<resources>
+  <string name="app_name">STL TESTNET verify</string>
+</resources>

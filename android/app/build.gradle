@@ -85,6 +85,28 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+/**
+ * Testnet verification build, for public recovery checks on an emulator.
+ * Set EXPO_PUBLIC_STL_VERIFY_TESTNET=1 when you build (Expo inlines the same
+ * variable into the JS bundle). Then, and only then:
+ *   - applicationId becomes com.stellartimelock.verify (cannot replace a real install)
+ *   - the release build is signed with the house debug key (android/app/debug.keystore)
+ *   - only fdroid tasks may run (no play flavor, no AAB)
+ *   - the app starts on testnet and cannot switch to mainnet
+ * Unset (every Play and F-Droid build): nothing here changes the build.
+ */
+def stlVerifyTestnet = (System.getenv('EXPO_PUBLIC_STL_VERIFY_TESTNET') ?: '') == '1'
+if (stlVerifyTestnet) {
+    gradle.taskGraph.whenReady { graph ->
+        def bad = graph.allTasks.findAll { t ->
+            t.project == project && (t.name.toLowerCase().contains('play') || t.name ==~ /bundle(Fdroid)?(Release|Debug)/)
+        }
+        if (!bad.isEmpty()) {
+            throw new GradleException("EXPO_PUBLIC_STL_VERIFY_TESTNET=1 builds only assembleFdroidRelease. Refusing: ${bad*.name}")
+        }
+    }
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
 
@@ -100,10 +122,26 @@ android {
         applicationId 'com.stellartimelock'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 30
-        versionName "1.6.19"
+        versionCode 31
+        versionName "1.6.20"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+        if (stlVerifyTestnet) {
+            applicationIdSuffix ".verify"
+            versionNameSuffix "-verifytestnet"
+        }
+    }
+    if (stlVerifyTestnet) {
+        // Launcher label "STL TESTNET verify" (overrides app_name for this build only)
+        // and a manifest overlay for this build only.
+        sourceSets {
+            fdroidRelease {
+                res.srcDirs += ['src/verifytestnet/res']
+                // Drops the PICK_KEY / TAP_PAY permission declarations so this build installs
+                // next to the real wallet and never serves keys or tap-pay to other apps.
+                manifest.srcFile 'src/verifytestnet/AndroidManifest.xml'
+            }
+        }
     }
     // Store flavors. "play" is the existing build (Google Play + sideload APKs), unchanged.
     // "fdroid" ships no proprietary libraries: no Firebase/FCM, no ML Kit / Play services,
@@ -139,7 +177,8 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.release
+            // The testnet verification build uses the house debug key, never the upload key.
+            signingConfig stlVerifyTestnet ? signingConfigs.debug : signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

@@ -14,7 +14,10 @@ describe("F-Droid flavor", () => {
     assert.match(appGradle, /flavorDimensions "store"/);
     assert.match(appGradle, /play \{\s*dimension "store"\s*\}/);
     assert.match(appGradle, /fdroid \{\s*dimension "store"/);
-    assert.doesNotMatch(appGradle, /applicationIdSuffix/);
+    // The only suffix is the testnet verification build's, behind its env flag.
+    const suffixes = appGradle.match(/applicationIdSuffix .*/g) ?? [];
+    assert.deepEqual(suffixes, ['applicationIdSuffix ".verify"']);
+    assert.match(appGradle, /if \(stlVerifyTestnet\) \{\s*applicationIdSuffix "\.verify"/);
     assert.match(appGradle, /applicationId 'com\.stellartimelock'/);
   });
 

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only used when EXPO_PUBLIC_STL_VERIFY_TESTNET=1 (see android/app/build.gradle).
+     The real wallet (com.stellartimelock) owns these permissions. The testnet
+     verification build does not declare or hold them, so it can be installed
+     next to the real wallet and no other app can pick a key from it. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+  <permission android:name="com.stellartimelock.wallet.permission.PICK_KEY" tools:node="remove"/>
+  <uses-permission android:name="com.stellartimelock.wallet.permission.PICK_KEY" tools:node="remove"/>
+  <permission android:name="com.stellartimelock.timelock.permission.TAP_PAY" tools:node="remove"/>
+  <uses-permission android:name="com.stellartimelock.timelock.permission.TAP_PAY" tools:node="remove"/>
+</manifest>

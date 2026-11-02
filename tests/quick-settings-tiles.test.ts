@@ -23,8 +23,8 @@ describe("quick settings tiles", () => {
     assert.match(strings, /name="qs_receive_xlm">Receive XLM</);
     assert.match(strings, /name="qs_send_xlm">Send XLM</);
     assert.match(strings, /name="qs_balance">Balance</);
-    assert.match(gradle, /versionCode 30/);
-    assert.match(gradle, /versionName "1\.6\.19"/);
+    assert.match(gradle, /versionCode 31/);
+    assert.match(gradle, /versionName "1\.6\.20"/);
   });
 
   it("opens the existing receive QR, send favorites, and balance after biometric", () => {

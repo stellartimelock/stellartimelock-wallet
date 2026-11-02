@@ -80,12 +80,12 @@ describe("wallet key picker contract", () => {
   });
 
   it("tracks the Android version and versionCode", () => {
-    assert.match(gradle, /versionCode 30/);
-    assert.match(gradle, /versionName "1\.6\.19"/);
-    assert.match(appVersion, /APP_VERSION = "1\.6\.19"/);
-    assert.match(appVersion, /BUILD_NUMBER = "30"/);
-    assert.match(appJson, /"version": "1\.6\.19"/);
-    assert.match(appJson, /"versionCode": 30/);
+    assert.match(gradle, /versionCode 31/);
+    assert.match(gradle, /versionName "1\.6\.20"/);
+    assert.match(appVersion, /APP_VERSION = "1\.6\.20"/);
+    assert.match(appVersion, /BUILD_NUMBER = "31"/);
+    assert.match(appJson, /"version": "1\.6\.20"/);
+    assert.match(appJson, /"versionCode": 31/);
   });
 
   it("documents the intent, extras, result, and both snippets", () => {

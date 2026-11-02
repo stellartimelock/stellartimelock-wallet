@@ -658,8 +658,8 @@ export default function Settings() {
           />
           <SettingsRow
             icon="code"
-            label="Audit Our Security Code"
-            sublabel="Wallet crypto, keystore, and on-chain interaction surface"
+            label="View Source Code"
+            sublabel="Wallet crypto, keystore, and on-chain code excerpts"
             onPress={() => router.push("/security-code")}
             chevron
             testID="settings-security-code-audit"

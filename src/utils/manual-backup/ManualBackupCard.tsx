@@ -61,9 +61,19 @@ interface Counts {
   wallets: number;
 }
 
+/**
+ * Message when there is no seed in memory. A wallet that is on the phone
+ * but locked (idle lock) is not "not loaded": say so, so the user unlocks.
+ */
+export function noSeedMessage(wallet: { publicKey?: string } | null | undefined): string {
+  return wallet?.publicKey
+    ? "Your wallet is locked. Unlock it, then try again."
+    : "No wallet loaded";
+}
+
 export function ManualBackupCard() {
   const toast = useToast();
-  const { wallet, refreshWallets } = useSession();
+  const { wallet, refreshWallets, setCurrency } = useSession();
   const [busy, setBusy] = useState<
     null | "export" | "import" | "share" | "pick-folder" | "open"
   >(null);
@@ -91,7 +101,7 @@ export function ManualBackupCard() {
   const runExport = useCallback(
     async (overwrite: boolean) => {
       if (!wallet?.secretSeed) {
-        toast.show("No wallet loaded", "error");
+        toast.show(noSeedMessage(wallet), "error");
         return;
       }
       setBusy("export");
@@ -133,7 +143,7 @@ export function ManualBackupCard() {
   const onExport = useCallback(async () => {
     if (busy) return;
     if (!wallet?.secretSeed) {
-      toast.show("No wallet loaded", "error");
+      toast.show(noSeedMessage(wallet), "error");
       return;
     }
     // Close any prior confirm sheet so the overwrite choice is visible.
@@ -150,7 +160,7 @@ export function ManualBackupCard() {
   const onImport = useCallback(async () => {
     if (busy) return;
     if (!wallet?.secretSeed) {
-      toast.show("No wallet loaded", "error");
+      toast.show(noSeedMessage(wallet), "error");
       return;
     }
     setBusy("import");
@@ -172,7 +182,7 @@ export function ManualBackupCard() {
   const handleImportFile = useCallback(async () => {
     if (busy || !pendingRestore) return;
     if (!wallet?.secretSeed) {
-      toast.show("No wallet loaded", "error");
+      toast.show(noSeedMessage(wallet), "error");
       return;
     }
     setBusy("import");
@@ -193,6 +203,7 @@ export function ManualBackupCard() {
       setPendingRestore(null);
       if (r.ok && r.applied) {
         await refreshWallets().catch(() => undefined);
+        if (r.applied.currency) await setCurrency(r.applied.currency).catch(() => undefined);
         setLastResult({
           kind: "import",
           at: Date.now(),
@@ -219,7 +230,7 @@ export function ManualBackupCard() {
     } finally {
       setBusy(null);
     }
-  }, [busy, pendingRestore, toast, wallet, refreshWallets]);
+  }, [busy, pendingRestore, toast, wallet, refreshWallets, setCurrency]);
 
   const onChangeFolder = useCallback(async () => {
     if (busy) return;

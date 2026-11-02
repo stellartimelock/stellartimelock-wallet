@@ -55,7 +55,7 @@ export default function Import() {
   const router = useRouter();
   const toast = useToast();
   const insets = useSafeAreaInsets();
-  const { setWallet, addImportedWallet, refreshWallets } = useSession();
+  const { setWallet, addImportedWallet, refreshWallets, setCurrency } = useSession();
 
   const [seed, setSeed] = useState("");
   const [busy, setBusy] = useState(false);
@@ -345,6 +345,7 @@ export default function Import() {
     try {
       const r = await importManualBackup(secret);
       if (r.ok && r.applied) {
+        if (r.applied.currency) await setCurrency(r.applied.currency).catch(() => undefined);
         await refreshWallets().catch(() => undefined);
         const walletBit =
           (r.applied.wallets ?? 0) > 0

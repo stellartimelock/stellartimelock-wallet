@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased (rides in the next normal release)
+## 1.6.20 (versionCode 31)
 - Scopuly is back: the compact Scopuly row on Home ("Connect this wallet"), the Scopuly screen with its icon, X and Play badges, and the Scopuly SEP-7 vault handoff code (`web+stellar:tx`, no callback). The handoff stays off (`SCOPULY_SEP7_HANDOFF_ENABLED = false`) and is tested on Testnet first; nothing signs or submits through Scopuly on mainnet. Tap-to-pay pay links are unchanged. No stored data or keys change.
+- Backups (.stvault) now carry the display currency (USD, EUR or XLM), and restoring one brings it back. The envelope stays v8, so older backups still import and older apps still read new ones.
+- Export, import and restore with the wallet idle-locked now say "Your wallet is locked. Unlock it, then try again." instead of "No wallet loaded".
+- Settings: "Audit Our Security Code" is now "View Source Code" (the page shows source excerpts; it is not an audit).
+- Testnet verification build for recovery checks on an emulator: `EXPO_PUBLIC_STL_VERIFY_TESTNET=1 ./gradlew assembleFdroidRelease -Pexpo.camera.barcode-scanner-enabled=false`. It is `com.stellartimelock.verify`, signed with the house debug key, labelled "STL TESTNET verify" with a TESTNET banner, and runs on testnet only. Play and F-Droid builds do not set the flag and are unchanged.
 
 ## 1.6.19 (versionCode 30)
 - First release with the `fdroid` build flavor: no Firebase/FCM, Google Play services, ML Kit or install referrer; QR pairing uses ZXing. The Play build is unchanged.

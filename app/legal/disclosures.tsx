@@ -31,8 +31,8 @@ export default function LegalDisclosuresScreen() {
           Various cryptographic libraries for encryption and key derivation
         </DocBullet>
         <DocParagraph>
-          Source code excerpts for security audit are available within the App
-          under Settings → Audit Our Security Code.
+          Source code excerpts are available within the App under
+          Settings → View Source Code.
         </DocParagraph>
       </DocSection>
 

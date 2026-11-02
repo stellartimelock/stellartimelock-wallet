@@ -7,6 +7,7 @@
 //   • TOTP entries
 //   • Key Manager entries (manually saved secret seeds)
 //   • Wallet metadata (nicknames)
+//   • Display currency (prefs.currency; older files simply omit it)
 //
 // The active wallet secret seed / key material is NEVER included in
 // the envelope — it lives in SecureStore independently. Key Manager
@@ -38,6 +39,11 @@ import {
   type WalletMeta,
 } from "@/src/wallet/wallet-book";
 import { moneySectionPresent } from "@/src/utils/save-compat";
+import {
+  isDisplayCurrency,
+  readDisplayCurrency,
+  type DisplayCurrency,
+} from "@/src/state/currency-pref";
 
 // v8 adds keyManager (saved keys). v7 added walletMeta (nicknames).
 // We accept v1–v8 on restore for backward compatibility.
@@ -59,6 +65,8 @@ export interface BackupEnvelope {
    */
   money?: unknown;
   prefs?: {
+    /** Display currency (USD, EUR or XLM). Optional: files before 1.6.20 omit it. */
+    currency?: DisplayCurrency;
     homeLayout?: string[];
     folderMeta?: Record<string, unknown>;
     sectionOrder?: string[];
@@ -76,6 +84,8 @@ export interface ApplyEnvelopeResult {
   keys?: number;
   wallets?: number;
   homeLayout?: number;
+  /** Display currency from the backup, when the file has one. The caller applies it. */
+  currency?: DisplayCurrency;
 }
 
 /**
@@ -106,6 +116,11 @@ export async function buildEnvelope(): Promise<BackupEnvelope> {
   } catch {
     walletMeta = undefined;
   }
+  // Display currency rides along so a restore brings it back. The
+  // envelope version stays 8: older apps ignore prefs, so their files and
+  // ours stay importable both ways.
+  const currency = await readDisplayCurrency();
+
   // Money and bills are no longer written. Older files that still
   // carry a money document are left untouched on disk.
 
@@ -171,6 +186,7 @@ export async function buildEnvelope(): Promise<BackupEnvelope> {
     totp,
     keyManager,
     walletMeta,
+    ...(currency ? { prefs: { currency } } : {}),
   };
 }
 
@@ -377,6 +393,10 @@ export async function applyEnvelope(env: BackupEnvelope): Promise<ApplyEnvelopeR
     billsApplied = 0;
   }
 
+  // Display currency (optional; missing in older files = leave as is).
+  const prefCurrency = env.prefs?.currency;
+  const currency = isDisplayCurrency(prefCurrency) ? prefCurrency : undefined;
+
   if (__DEV__) {
     console.timeEnd("[backup] applyEnvelope:total");
   }
@@ -390,6 +410,7 @@ export async function applyEnvelope(env: BackupEnvelope): Promise<ApplyEnvelopeR
     keys: keysCount,
     wallets: walletCount,
     homeLayout: 0,
+    currency,
   };
 }
 

@@ -10,6 +10,7 @@ import React, {
 import { AppState, type AppStateStatus } from "react-native";
 
 import { storage } from "@/src/utils/storage";
+import { CURRENCY_KEY } from "@/src/state/currency-pref";
 import {
   StellarKeypair,
   clearKeypair,
@@ -36,7 +37,7 @@ import {
   setActiveNetwork,
   deploymentFor,
 } from "@/src/wallet/contract-config";
-import { isPlayReleaseBuild } from "@/src/wallet/play-network";
+import { isPlayReleaseBuild, isVerifyTestnetBuild } from "@/src/wallet/play-network";
 import {
   clearBrowseMode,
   enableBrowseMode as persistBrowseMode,
@@ -55,7 +56,6 @@ const NETWORK_KEY = "xlm_vault_network";
 
 export type Currency = "USD" | "EUR" | "XLM";
 
-const CURRENCY_KEY = "xlm_vault_currency";
 const PRICE_CACHE_KEY = "xlm_vault_market_price_cache";
 /** Discard persisted market rates older than this — force a fresh fetch. */
 const PRICE_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -245,7 +245,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (cur === "USD" || cur === "EUR" || cur === "XLM") setCurrencyState(cur);
       try {
         void net;
-        const candidate: StellarNetwork = "mainnet";
+        // Release builds start on mainnet. The testnet verification build
+        // (com.stellartimelock.verify) starts on testnet and stays there.
+        const candidate: StellarNetwork = isVerifyTestnetBuild() ? "testnet" : "mainnet";
         deploymentFor(candidate);
         setActiveNetwork(candidate);
         setNetworkState(candidate);
@@ -380,7 +382,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setNetwork = useCallback(async (n: StellarNetwork) => {
-    if (isPlayReleaseBuild() && n !== "mainnet") return;
+    if (isVerifyTestnetBuild()) {
+      if (n !== "testnet") return;
+    } else if (isPlayReleaseBuild() && n !== "mainnet") {
+      return;
+    }
     setActiveNetwork(n);
     setNetworkState(n);
     await storage.setItem<StellarNetwork>(NETWORK_KEY, n);
