@@ -6,6 +6,7 @@ const theme = readFileSync("src/theme/index.ts", "utf8");
 const appJson = readFileSync("app.json", "utf8");
 const colorsXml = readFileSync("android/app/src/main/res/values/colors.xml", "utf8");
 const settings = readFileSync("app/settings.tsx", "utf8");
+const scopuly = readFileSync("app/scopuly.tsx", "utf8");
 const wallet = readFileSync("app/(tabs)/wallet.tsx", "utf8");
 
 const screens = [
@@ -14,6 +15,7 @@ const screens = [
   "app/send.tsx",
   "app/settings.tsx",
   "app/vault/[id].tsx",
+  "app/scopuly.tsx",
   "app/key-manager.tsx",
 ];
 
@@ -51,12 +53,17 @@ describe("1.6.5 restores the 1.6.0 Aurora UI", () => {
     assert.doesNotMatch(source, /if \(!accessChecked\) return null/);
   });
 
-  it("still clears copied seeds", () => {
+  it("still clears copied seeds, and Scopuly is an ordinary screen", () => {
     assert.match(settings, /copySecretToClipboard\(secret\)/);
     assert.match(settings, /key === "phrase" \|\| key === "seed"/);
+    assert.match(scopuly, /testID="scopuly-back"/);
+    assert.match(scopuly, /chevron-left/);
+    assert.doesNotMatch(scopuly, /prepareScopulyRequest/);
   });
 
-  it("hides the removed 1.6.4 surfaces", () => {
+  it("keeps a compact Scopuly row and hides the removed 1.6.4 surfaces", () => {
+    assert.match(wallet, /testID="wallet-scopuly-row"/);
+    assert.match(wallet, /router\.push\("\/scopuly"\)/);
     assert.match(wallet, /Updating your wallet…/);
     assert.match(wallet, /testID="wallet-updating"/);
     assert.match(wallet, /colors\.textSecondary/);
@@ -66,7 +73,7 @@ describe("1.6.5 restores the 1.6.0 Aurora UI", () => {
     assert.doesNotMatch(settings, /settings-assistant/);
     assert.doesNotMatch(settings, /settings-bills/);
     assert.doesNotMatch(settings, /ComingSoonSection/);
-    const note = wallet.slice(wallet.indexOf("updatingNote:"), wallet.indexOf("abHeader:"));
+    const note = wallet.slice(wallet.indexOf("updatingNote:"), wallet.indexOf("scopulyRow:"));
     assert.match(note, /colors\.textSecondary/);
     assert.doesNotMatch(note, /colors\.danger/);
   });

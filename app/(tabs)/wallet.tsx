@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -374,6 +375,7 @@ export default function WalletScreen() {
 
         <UpdatingNote />
         <KeyButton />
+        <ScopulyRow />
 
         <View style={styles.abHeader}>
           <Text style={styles.section}>SMART ADDRESS BOOK</Text>
@@ -525,6 +527,31 @@ function UpdatingNote() {
     >
       Updating your wallet…
     </Text>
+  );
+}
+
+function ScopulyRow() {
+  return (
+    <TouchableOpacity
+      style={styles.scopulyRow}
+      onPress={() => router.push("/scopuly")}
+      activeOpacity={0.8}
+      testID="wallet-scopuly-row"
+      accessibilityRole="button"
+      accessibilityLabel="Scopuly. Connect this wallet."
+    >
+      <Image
+        source={require("@/assets/brand/scopuly.png")}
+        style={styles.scopulyMark}
+        resizeMode="contain"
+        accessibilityLabel="Scopuly"
+      />
+      <View style={styles.scopulyCopy}>
+        <Text style={styles.keyButtonLabel}>Scopuly</Text>
+        <Text style={styles.keyButtonSub}>Connect this wallet</Text>
+      </View>
+      <Feather name="chevron-right" size={16} color={colors.textTertiary} />
+    </TouchableOpacity>
   );
 }
 
@@ -963,6 +990,24 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: spacing.sm,
   },
+  scopulyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceFrost,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+    marginBottom: spacing.sm,
+  },
+  scopulyMark: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+  },
+  scopulyCopy: { flex: 1 },
 
   abHeader: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",

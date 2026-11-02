@@ -1,11 +1,13 @@
 # Changelog
 
+## Unreleased (rides in the next normal release)
+- Scopuly is back: the compact Scopuly row on Home ("Connect this wallet"), the Scopuly screen with its icon, X and Play badges, and the Scopuly SEP-7 vault handoff code (`web+stellar:tx`, no callback). The handoff stays off (`SCOPULY_SEP7_HANDOFF_ENABLED = false`) and is tested on Testnet first; nothing signs or submits through Scopuly on mainnet. Tap-to-pay pay links are unchanged. No stored data or keys change.
+
 ## 1.6.19 (versionCode 30)
 - First release with the `fdroid` build flavor: no Firebase/FCM, Google Play services, ML Kit or install referrer; QR pairing uses ZXing. The Play build is unchanged.
 - Source published at https://github.com/stellartimelock/stellartimelock-wallet (GPL-3.0-or-later).
 
 ## 1.6.18 (versionCode 29)
-- Removed Scopuly: the Home row, the Scopuly screen, its icon and badges, and the unused Scopuly SEP-7 vault handoff code. Tap-to-pay SEP-7 pay links are unchanged. No stored data or keys change.
 - Swap goes through the StellarTimeLock swap proxy (Cloudflare Worker, source in `proxy/`). The app no longer contains a SimpleSwap partner key.
 - Removed Google Play Billing (react-native-iap) and the BILLING permission. Paid tiers were never launched.
 - Removed unused react-native-dotenv; @expo/ngrok is a dev dependency only.
