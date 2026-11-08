@@ -21,16 +21,14 @@
 import { detectEncryptedFormat } from "@/src/security/crypto";
 import {
   listKeyEntries,
-  removeKeyEntry,
+  replaceKeyEntries,
   syncKeyManagerLabelForPublicKey,
-  upsertKeyEntry,
   type KeyManagerEntry,
 } from "@/src/security/key-manager-store";
-import { listEntries, upsertEntry, removeEntry, type AddressBookEntry } from "@/src/wallet/address-book";
+import { listEntries, replaceAddressBook, type AddressBookEntry } from "@/src/wallet/address-book";
 import {
   listTotpEntries,
-  removeTotpEntry,
-  upsertTotpEntry,
+  replaceTotpEntries,
   type TotpEntry,
 } from "@/src/security/totp/store";
 import {
@@ -38,6 +36,18 @@ import {
   writeBook,
   type WalletMeta,
 } from "@/src/wallet/wallet-book";
+import {
+  applyWalletLabelsToKeys,
+  coercedEnvelopeVersion,
+  envelopeHasWalletFields,
+  mergeRestoredAddresses,
+  mergeRestoredKeys,
+  mergeRestoredTotp,
+  type RestoreAddress,
+  type RestoreKey,
+  type RestoreTotp,
+  type RestoreWallet,
+} from "@/src/utils/manual-backup/restore-merge";
 import { moneySectionPresent } from "@/src/utils/save-compat";
 import {
   isDisplayCurrency,
@@ -86,6 +96,8 @@ export interface ApplyEnvelopeResult {
   homeLayout?: number;
   /** Display currency from the backup, when the file has one. The caller applies it. */
   currency?: DisplayCurrency;
+  /** Set when a section could not be saved. Earlier sections were still written. */
+  error?: string;
 }
 
 /**
@@ -219,9 +231,23 @@ export function isSupportedEnvelopeVersion(v: unknown): v is BackupEnvelope["v"]
   return v === 1 || v === 2 || v === 3 || v === 4 || v === 5 || v === 6 || v === 7 || v === 8;
 }
 
-export async function applyEnvelope(env: BackupEnvelope): Promise<ApplyEnvelopeResult> {
-  if (!isSupportedEnvelopeVersion(env?.v)) {
+export async function applyEnvelope(
+  env: BackupEnvelope,
+  hooks?: { onProgress?: (message: string) => void },
+): Promise<ApplyEnvelopeResult> {
+  const report = (message: string) => {
+    try {
+      hooks?.onProgress?.(message);
+    } catch {
+      /* progress is advisory */
+    }
+  };
+  const version = coercedEnvelopeVersion(env?.v, envelopeHasWalletFields(env ?? {}));
+  if (version == null) {
     throw new Error("Backup file is malformed (unknown version).");
+  }
+  if (!isSupportedEnvelopeVersion(env?.v)) {
+    env = { ...env, v: version };
   }
   // Older files omit sections. A missing list is "not in this backup",
   // not "delete what is on the phone".
@@ -234,123 +260,44 @@ export async function applyEnvelope(env: BackupEnvelope): Promise<ApplyEnvelopeR
     );
   }
 
-  // Merge address book (LWW by updatedAt)
-  const addrTs = (a: AddressBookEntry): number =>
-    (a as { updatedAt?: number }).updatedAt ?? a.createdAt ?? 0;
-  const localAddrs = addressesPresent ? await listEntries() : [];
-  const localAddrById = new Map(localAddrs.map((a) => [a.id, a]));
-  const remoteAddrIds = new Set((addressesPresent ? env.addresses : []).map((a) => a.id));
-  for (const ra of addressesPresent ? env.addresses : []) {
-    const la = localAddrById.get(ra.id);
-    if (!la || addrTs(ra) > addrTs(la)) {
-      try {
-        let network = ra.network;
-        if (!network) {
-          const publicKey = (ra.publicKey ?? "").trim();
-          const isSolana = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(publicKey) &&
-            !/^G[A-Z2-7]{55}$/.test(publicKey);
-          network = isSolana ? "solana" : "stellar";
-        }
-        await upsertEntry({
-          id: ra.id,
-          label: ra.label,
-          publicKey: ra.publicKey,
-          defaultMemo: ra.defaultMemo,
-          kind: ra.kind,
-          network,
-          icon: ra.icon,
-        });
-      } catch {
-        /* skip invalid remote entries */
-      }
-    }
-  }
+  const problems: string[] = [];
+
+  report("Restoring contacts…");
+  let addressCount = env.addresses?.length ?? 0;
   if (addressesPresent) {
-    for (const la of localAddrs) {
-      if (!remoteAddrIds.has(la.id)) {
-        try { await removeEntry(la.id); } catch { /* non-fatal */ }
+    try {
+      const localAddrs = await listEntries();
+      const merged = mergeRestoredAddresses(
+        localAddrs as RestoreAddress[],
+        env.addresses as RestoreAddress[],
+      );
+      if (merged) {
+        await replaceAddressBook(merged as AddressBookEntry[]);
+        addressCount = merged.length;
       }
+    } catch {
+      problems.push("Couldn\u2019t save contacts.");
+      addressCount = 0;
     }
   }
 
-  // Merge TOTP
+  report("Restoring authenticator…");
   let totpCount: number | undefined;
   if (Array.isArray(env.totp)) {
     try {
       const localTotp = await listTotpEntries();
-      const localTotpById = new Map(localTotp.map((t) => [t.id, t]));
-      const remoteTotpIds = new Set(env.totp.map((t) => t.id));
-      for (const rt of env.totp) {
-        const lt = localTotpById.get(rt.id);
-        if (!lt || (rt.updatedAt ?? 0) > (lt.updatedAt ?? 0)) {
-          try {
-            await upsertTotpEntry({
-              id: rt.id,
-              name: rt.name,
-              issuer: rt.issuer,
-              secret: rt.secret,
-              isDefault: rt.isDefault,
-            });
-          } catch { /* skip */ }
-        }
-      }
-      for (const lt of localTotp) {
-        if (!remoteTotpIds.has(lt.id)) {
-          try { await removeTotpEntry(lt.id); } catch { /* non-fatal */ }
-        }
-      }
-      totpCount = env.totp.length;
+      const merged = mergeRestoredTotp(localTotp as RestoreTotp[], env.totp as RestoreTotp[]);
+      if (merged) await replaceTotpEntries(merged as TotpEntry[]);
+      totpCount = merged?.length ?? env.totp.length;
     } catch {
+      problems.push("Couldn\u2019t save authenticator entries.");
       totpCount = 0;
     }
   }
 
-  // Merge Key Manager entries (LWW by updatedAt / createdAt)
-  let keysCount: number | undefined;
-  if (Array.isArray(env.keyManager)) {
-    try {
-      const keyTs = (k: KeyManagerEntry): number =>
-        k.updatedAt ?? k.createdAt ?? 0;
-      const localKeys = await listKeyEntries();
-      const localKeyById = new Map(localKeys.map((k) => [k.id, k]));
-      const remoteKeyIds = new Set(env.keyManager.map((k) => k.id));
-      for (const rk of env.keyManager) {
-        const lk = localKeyById.get(rk.id);
-        if (!lk || keyTs(rk) > keyTs(lk)) {
-          try {
-            await upsertKeyEntry(
-              {
-                id: rk.id,
-                label: rk.label,
-                secretSeed: rk.secretSeed,
-                publicAddress: rk.publicAddress,
-                seedPhrase: rk.seedPhrase,
-                notes: rk.notes,
-              },
-              // The restore screen already confirmed replacing local data.
-              { confirmShrink: true },
-            );
-          } catch { /* skip invalid remote entries */ }
-        }
-      }
-      for (const lk of localKeys) {
-        if (!remoteKeyIds.has(lk.id)) {
-          try {
-            await removeKeyEntry(lk.id, { confirmShrink: true });
-          } catch { /* non-fatal */ }
-        }
-      }
-      keysCount = env.keyManager.length;
-    } catch {
-      keysCount = 0;
-    }
-  }
-
-  // Restore wallet nicknames from the backup onto matching local
-  // wallets (matched by public key). Secrets are never in the
-  // envelope — we only revive labels for wallets already on device.
-  // Then mirror those labels into Key Manager so both UIs agree.
+  report("Restoring wallet names…");
   let walletCount: number | undefined;
+  let labeledBook: WalletMeta[] | null = null;
   if (Array.isArray(env.walletMeta) && env.walletMeta.length > 0) {
     try {
       const book = await loadBook();
@@ -366,22 +313,35 @@ export async function applyEnvelope(env: BackupEnvelope): Promise<ApplyEnvelopeR
           (remote.updatedAt != null && entry.updatedAt !== remote.updatedAt)
         ) {
           entry.label = remote.label;
-          entry.updatedAt =
-            remote.updatedAt ?? remote.createdAt ?? Date.now();
+          entry.updatedAt = remote.updatedAt ?? remote.createdAt ?? Date.now();
           changed = true;
         }
       }
       if (changed) await writeBook(book);
-      for (const entry of book.entries) {
-        try {
-          await syncKeyManagerLabelForPublicKey(entry.publicKey, entry.label);
-        } catch {
-          /* non-fatal */
-        }
-      }
+      labeledBook = book.entries;
       walletCount = env.walletMeta.length;
     } catch {
+      problems.push("Couldn\u2019t save wallet names.");
       walletCount = 0;
+    }
+  }
+
+  report("Restoring saved keys…");
+  let keysCount: number | undefined;
+  if (Array.isArray(env.keyManager)) {
+    try {
+      const localKeys = await listKeyEntries();
+      let merged = mergeRestoredKeys(localKeys as RestoreKey[], env.keyManager as RestoreKey[]);
+      if (merged && labeledBook) {
+        merged = applyWalletLabelsToKeys(merged, labeledBook as RestoreWallet[]);
+      }
+      if (merged) {
+        await replaceKeyEntries(merged as KeyManagerEntry[], { confirmShrink: true });
+      }
+      keysCount = merged?.length ?? env.keyManager.length;
+    } catch {
+      problems.push("Couldn\u2019t save keys.");
+      keysCount = 0;
     }
   }
 
@@ -403,7 +363,7 @@ export async function applyEnvelope(env: BackupEnvelope): Promise<ApplyEnvelopeR
   return {
     notes: 0,
     bills: billsApplied,
-    addresses: env.addresses.length,
+    addresses: addressCount,
     ledger: 0,
     ledgerSlots: 0,
     totp: totpCount,
@@ -411,6 +371,7 @@ export async function applyEnvelope(env: BackupEnvelope): Promise<ApplyEnvelopeR
     wallets: walletCount,
     homeLayout: 0,
     currency,
+    error: problems[0],
   };
 }
 

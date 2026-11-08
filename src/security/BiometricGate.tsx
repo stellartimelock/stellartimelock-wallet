@@ -64,6 +64,7 @@ import {
 } from "@/src/security/session-keystore";
 import { loadActiveKeypair, loadBook } from "@/src/wallet/wallet-book";
 import { keypairFromSecretSeed } from "@/src/wallet/stellar";
+import { keypairFromMnemonic } from "@/src/wallet/seed-phrase";
 import { useSession } from "@/src/state/session";
 /** Public helper — used by anywhere that wants the boolean without
  *  importing session-keystore directly. */
@@ -381,6 +382,7 @@ export function BiometricGate({
         seedInput,
         entry.publicKey,
         (s) => keypairFromSecretSeed(s).publicKey,
+        (phrase) => keypairFromMnemonic(phrase),
       );
       if (!checked.ok) {
         setSeedError(checked.error);
@@ -510,8 +512,8 @@ export function BiometricGate({
             </View>
             <Text style={styles.modalTitle}>Enter your seed</Text>
             <Text style={styles.modalSub}>
-              Type or paste your 56-character Stellar secret seed (starts with S).
-              It stays in memory. Fingerprint unlock will remember this wallet.
+              Type or paste a 12- or 24-word recovery phrase, or a 56-character secret seed.
+              It stays in memory and must match this wallet.
             </Text>
             <TextInput
               value={seedInput}
@@ -533,10 +535,10 @@ export function BiometricGate({
             ) : null}
             <TouchableOpacity
               onPress={() => { void handleSeedUnlock(); }}
-              disabled={seedBusy || seedInput.trim().length < 10}
+              disabled={seedBusy || seedInput.trim().length === 0}
               style={[
                 styles.modalBtn,
-                (seedBusy || seedInput.trim().length < 10) && { opacity: 0.5 },
+                (seedBusy || seedInput.trim().length === 0) && { opacity: 0.5 },
               ]}
               testID={`biometric-gate-seed-submit-${surfaces.join("-")}`}
             >

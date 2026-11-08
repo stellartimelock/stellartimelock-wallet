@@ -2,7 +2,7 @@
 // Atomic replace, .bak1–.bak5, and a confirm step when the new file is
 // empty or smaller than the current one. The picker never writes this file.
 
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 
 import {
@@ -24,15 +24,29 @@ function confirmWithAlert(block: OverwriteBlock): Promise<boolean> {
       ? `This would replace a ${block.previousBytes}-byte key save with an empty file. Older copies are kept as .bak1 through .bak5.`
       : `This would shrink the key save from ${block.previousBytes} bytes to ${block.nextBytes} bytes. Older copies are kept as .bak1 through .bak5.`;
   return new Promise((resolve) => {
-    Alert.alert(
-      title,
-      message,
-      [
-        { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-        { text: "Overwrite", style: "destructive", onPress: () => resolve(true) },
-      ],
-      { cancelable: false },
-    );
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    // OnePlus and web can leave Alert.alert pending. Don't wait forever.
+    const timer = setTimeout(() => finish(false), 12_000);
+    try {
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: "Cancel", style: "cancel", onPress: () => finish(false) },
+          { text: "Overwrite", style: "destructive", onPress: () => finish(true) },
+        ],
+        { cancelable: true, onDismiss: () => finish(false) },
+      );
+    } catch {
+      finish(false);
+    }
+    if (Platform.OS === "web") finish(false);
   });
 }
 

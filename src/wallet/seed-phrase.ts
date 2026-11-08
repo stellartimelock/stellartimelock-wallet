@@ -14,7 +14,6 @@ import {
   validateMnemonic,
 } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english.js";
-import * as Crypto from "expo-crypto";
 
 import {
   encodeEd25519PublicKey,
@@ -44,6 +43,7 @@ export async function generateSeedPhrase(
   strength: SeedStrength = 12,
 ): Promise<string> {
   const entropyBytes = strength === 12 ? 16 : 32;
+  const Crypto = await import("expo-crypto");
   const bytes = await Crypto.getRandomBytesAsync(entropyBytes);
   return entropyToMnemonic(bytes, wordlist);
 }
