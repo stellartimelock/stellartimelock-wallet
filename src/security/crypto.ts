@@ -8,7 +8,7 @@
 import * as Crypto from "expo-crypto";
 
 import {
-  decryptBackup,
+  decryptBackupAsync,
   detectEncryptedFormat,
   encryptV3,
   isEncryptedPayload,
@@ -28,5 +28,5 @@ export async function encrypt(plaintext: string, secretSeed: string): Promise<st
  * SHA-1 key 1.6.4 used. Returns "" for empty, tampered, or wrong-seed input.
  */
 export async function decrypt(payload: string, secretSeed: string): Promise<string> {
-  return decryptBackup(payload, secretSeed);
+  return decryptBackupAsync(payload, secretSeed);
 }

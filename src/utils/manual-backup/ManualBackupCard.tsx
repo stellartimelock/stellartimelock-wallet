@@ -39,8 +39,10 @@ import { trackEvent } from "@/src/analytics/firebase";
 import { RestoreConfirmModal } from "@/src/utils/backup-warning-modal/RestoreConfirmModal";
 import {
   exportManualBackup,
+  backupFolderPromptNeeded,
   getCurrentAndroidSaveFolderLabel,
   getLastBackupMeta,
+  markBackupFolderPrompted,
   openBackupLocation,
   pickAndroidSaveFolder,
   pickManualBackupFile,
@@ -87,6 +89,8 @@ export function ManualBackupCard() {
   const [confirm, setConfirm] = useState<ExportResult | null>(null);
   const [importConfirmVisible, setImportConfirmVisible] = useState(false);
   const [pendingRestore, setPendingRestore] = useState<PickedBackup | null>(null);
+  const [restoreProgress, setRestoreProgress] = useState<string | null>(null);
+  const [folderPrompt, setFolderPrompt] = useState<string | null>(null);
   const [overwritePrompt, setOverwritePrompt] = useState<LastBackupMeta | null>(
     null,
   );
@@ -157,13 +161,9 @@ export function ManualBackupCard() {
   }, [busy, toast, wallet, runExport]);
 
 
-  const onImport = useCallback(async () => {
-    if (busy) return;
-    if (!wallet?.secretSeed) {
-      toast.show(noSeedMessage(wallet), "error");
-      return;
-    }
+  const stagePickedFile = useCallback(async () => {
     setBusy("import");
+    setRestoreProgress("Reading backup…");
     try {
       const picked = await pickManualBackupFile();
       if (!picked.ok) {
@@ -176,8 +176,30 @@ export function ManualBackupCard() {
       setImportConfirmVisible(true);
     } finally {
       setBusy(null);
+      setRestoreProgress(null);
     }
-  }, [busy, toast, wallet]);
+  }, [toast]);
+
+  const onImport = useCallback(async () => {
+    if (busy) return;
+    if (!wallet?.secretSeed) {
+      toast.show(noSeedMessage(wallet), "error");
+      return;
+    }
+    const gate = await backupFolderPromptNeeded().catch(() => ({ prompt: false, message: "" }));
+    if (gate.prompt) {
+      setFolderPrompt(gate.message);
+      return;
+    }
+    await stagePickedFile();
+  }, [busy, toast, wallet, stagePickedFile]);
+
+  const dismissFolderPrompt = useCallback(async (choose: boolean) => {
+    setFolderPrompt(null);
+    await markBackupFolderPrompted().catch(() => undefined);
+    if (choose) await pickAndroidSaveFolder().catch(() => undefined);
+    await stagePickedFile();
+  }, [stagePickedFile]);
 
   const handleImportFile = useCallback(async () => {
     if (busy || !pendingRestore) return;
@@ -198,6 +220,7 @@ export function ManualBackupCard() {
         wallet.secretSeed,
         pendingRestore.raw,
         pendingRestore.fileName,
+        { onProgress: setRestoreProgress },
       );
       setImportConfirmVisible(false);
       setPendingRestore(null);
@@ -229,6 +252,7 @@ export function ManualBackupCard() {
       }
     } finally {
       setBusy(null);
+      setRestoreProgress(null);
     }
   }, [busy, pendingRestore, toast, wallet, refreshWallets, setCurrency]);
 
@@ -337,6 +361,12 @@ export function ManualBackupCard() {
         </Text>
       )}
 
+      {restoreProgress && busy === "import" && !importConfirmVisible ? (
+        <Text style={styles.footnote} testID="manual-backup-progress">
+          {restoreProgress}
+        </Text>
+      ) : null}
+
       {confirm && confirm.ok ? (
         <ExportConfirmModal
           result={confirm}
@@ -434,8 +464,41 @@ export function ManualBackupCard() {
         void handleImportFile();
       }}
       busy={busy === "import"}
+      progress={restoreProgress}
       testIDPrefix="manual-import-confirm"
     />
+    <Modal
+      visible={folderPrompt != null}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        void dismissFolderPrompt(false);
+      }}
+    >
+      <View style={styles.folderPromptRoot}>
+        <View style={styles.folderPromptCard} testID="manual-backup-folder-prompt">
+          <Text style={styles.folderPromptTitle}>Backup folder</Text>
+          <Text style={styles.folderPromptBody}>{folderPrompt}</Text>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => {
+              void dismissFolderPrompt(true);
+            }}
+            testID="manual-backup-folder-choose"
+          >
+            <Text style={styles.actionBtnText}>Choose folder</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              void dismissFolderPrompt(false);
+            }}
+            testID="manual-backup-folder-dismiss"
+          >
+            <Text style={styles.folderBtnText}>Not now</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
     {overwritePrompt ? (
       <OverwriteChoiceModal
         fileName={overwritePrompt.fileName}
@@ -778,6 +841,20 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderSubtle,
   },
+  folderPromptRoot: {
+    flex: 1,
+    justifyContent: "center",
+    padding: spacing.lg,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  folderPromptCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  folderPromptTitle: { color: colors.text, fontSize: 16, fontWeight: "700" },
+  folderPromptBody: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
   folderLabel: {
     flex: 1,
     color: colors.textSecondary,

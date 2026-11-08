@@ -236,10 +236,25 @@ export { hasDerivedSigningKey };
  */
 export async function removeWalletSeed(id: string): Promise<void> {
   wipeCacheEntry(id);
-  // Clean up legacy on-disk slots written by older app versions.
   await storage.secureRemove(legacySecretKeyFor(id));
+  await storage.secureRemove(authSeedKey(id));
   await storage.removeItem(legacyAuthFlagKeyFor(id));
   await removeDerivedSigningKey(id);
+  await removeWalletMnemonic(id);
+  mirrorSeedToPicker();
+}
+
+/**
+ * Drop every in-memory seed and the UI lock. Disconnect calls this after
+ * the per-wallet deletes so a later restore is not blocked by a leftover lock.
+ */
+export function releaseSessionAfterDisconnect(): void {
+  sessionLocked = false;
+  for (const id of Array.from(sessionCache.keys())) wipeCacheEntry(id);
+  sessionCache.clear();
+  clearSessionRoot();
+  dropCachedWrappingKey();
+  publishLock();
   mirrorSeedToPicker();
 }
 

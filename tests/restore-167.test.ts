@@ -181,14 +181,15 @@ describe("1.6.7 restore and PBKDF2", () => {
     if (notes.kind === "not-wallet") assert.match(notes.message, /not a Stellar TimeLock wallet backup/);
   });
 
-  it("keeps restore on the synchronous seed derivation and does not rewrite files", () => {
+  it("opens a backup with the yielding reader and does not delete files", () => {
     const source = readFileSync("src/utils/manual-backup/manual-backup.ts", "utf8");
     const start = source.indexOf("export async function restoreManualBackupPayload");
     const end = source.indexOf("export async function importManualBackup");
     const body = source.slice(start, end);
     assert.match(body, /openClassifiedBackup/);
-    assert.match(body, /decrypt\)/);
-    assert.doesNotMatch(body, /decryptBackupAsync|pbkdf2Async|sessionCache|deleteAsync|unlink/);
+    assert.match(body, /decryptBackupAsync/);
+    assert.match(body, /onProgress/);
+    assert.doesNotMatch(body, /deleteAsync|unlink/);
     const card = readFileSync("src/utils/manual-backup/ManualBackupCard.tsx", "utf8");
     const importer = readFileSync("app/import.tsx", "utf8");
     assert.match(card, /r\.tone === "info" \? "info" : "error"/);

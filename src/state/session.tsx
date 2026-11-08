@@ -292,10 +292,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [endBrowseMode]);
 
   const disconnect = useCallback(async () => {
-    if (walletRef.current) {
+    const publicKey = walletRef.current?.publicKey;
+    if (publicKey) {
       try {
         const { clearCachedVaults } = await import("@/src/api/vault-cache");
-        await clearCachedVaults(walletRef.current.publicKey);
+        await clearCachedVaults(publicKey);
       } catch {
         // ignore
       }
@@ -303,7 +304,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         const { invalidateVaultSessionCache } = await import(
           "@/src/vault/vault-session-cache"
         );
-        invalidateVaultSessionCache(walletRef.current.publicKey);
+        invalidateVaultSessionCache(publicKey);
       } catch {
         // ignore
       }
@@ -311,17 +312,36 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         const { clearMemoDiscoveryScanCache } = await import(
           "@/src/vault/memo-discovery"
         );
-        clearMemoDiscoveryScanCache(walletRef.current.publicKey);
+        clearMemoDiscoveryScanCache(publicKey);
       } catch {
         // ignore
       }
     }
-    await clearKeypair();
-    await clearBook();
-    await endBrowseMode();
+    try {
+      await clearKeypair();
+    } catch {
+      // ignore
+    }
+    try {
+      await clearBook();
+    } catch {
+      // ignore
+    }
+    try {
+      await endBrowseMode();
+    } catch {
+      // ignore
+    }
+    try {
+      const { clearKeyManagerSession } = await import("@/src/security/key-manager-store");
+      clearKeyManagerSession();
+    } catch {
+      // ignore
+    }
     setWallets([]);
     setActiveWalletId(null);
     setWalletState(null);
+    setBrowseMode(false);
   }, [endBrowseMode]);
 
   const addBurnerWallet = useCallback(async (label: string) => {

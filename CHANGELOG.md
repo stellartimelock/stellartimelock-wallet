@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.21 (versionCode 32)
+- Restoring a backup finishes instead of stopping halfway. A large file shows progress. A file that cannot be read shows a plain error. Older backups that omit the wrapper or the version still open. Automatic copies are saved under StellarTimeLock backups/StellarTimeLock/. If the old folder is gone, the app asks once to point at the StellarTimeLock backups folder.
+- Disconnect clears the wallet, including the in-memory seed and the encrypted-data cache, so Restore with seed can run. A recovery phrase is checked and turned into the Stellar account at m/44'/148'/0' (SEP-0005). That account opens the encrypted data on the phone. A bad phrase or seed shows an error.
+
 ## 1.6.20 (versionCode 31)
 - Scopuly is back: the compact Scopuly row on Home ("Connect this wallet"), the Scopuly screen with its icon, X and Play badges, and the Scopuly SEP-7 vault handoff code (`web+stellar:tx`, no callback). The handoff stays off (`SCOPULY_SEP7_HANDOFF_ENABLED = false`) and is tested on Testnet first; nothing signs or submits through Scopuly on mainnet. Tap-to-pay pay links are unchanged. No stored data or keys change.
 - Backups (.stvault) now carry the display currency (USD, EUR or XLM), and restoring one brings it back. The envelope stays v8, so older backups still import and older apps still read new ones.

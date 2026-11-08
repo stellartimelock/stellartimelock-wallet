@@ -3,10 +3,10 @@
 // BUILD_NUMBER is the Android versionCode compared against the update manifest.
 
 /** Semantic version string shown in Settings → About. */
-export const APP_VERSION = "1.6.20";
+export const APP_VERSION = "1.6.21";
 
 /** Integer build number shown alongside the version. Increment with every release build. */
-export const BUILD_NUMBER = "31";
+export const BUILD_NUMBER = "32";
 
 /** Android versionCode. The update checker treats a higher manifest versionCode as newer. */
 export const VERSION_CODE = Number(BUILD_NUMBER);

@@ -9,8 +9,8 @@
 //   • first-run, tour pending → /onboarding-choice
 //   • fallback                → /wallet-setup
 
-import { useRouter } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import { useRouter, useFocusEffect } from "expo-router";
+import React, { useCallback } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { useSession } from "@/src/state/session";
@@ -25,40 +25,43 @@ import {
 export default function Index() {
   const router = useRouter();
   const { ready } = useSession();
-  const redirected = useRef(false);
 
-  useEffect(() => {
-    if (!ready) return;
-    if (redirected.current) return;
-    redirected.current = true;
+  useFocusEffect(
+    useCallback(() => {
+      if (!ready) return;
+      let cancelled = false;
+      void (async () => {
+        const [book, browsing, tourPending, valuePropPending] = await Promise.all([
+          loadBook(),
+          isBrowseMode(),
+          isTourChoicePending(),
+          isValuePropPending(),
+        ]);
+        if (cancelled) return;
 
-    void (async () => {
-      const [book, browsing, tourPending, valuePropPending] = await Promise.all([
-        loadBook(),
-        isBrowseMode(),
-        isTourChoicePending(),
-        isValuePropPending(),
-      ]);
-
-      if (book.entries.length > 0) {
-        router.replace("/(tabs)/wallet");
-        return;
-      }
-      if (browsing) {
-        router.replace("/(tabs)/wallet");
-        return;
-      }
-      if (!tourPending) {
-        router.replace("/wallet-setup");
-        return;
-      }
-      if (valuePropPending) {
-        router.replace("/welcome" as never);
-        return;
-      }
-      router.replace("/onboarding-choice" as never);
-    })();
-  }, [ready, router]);
+        if (book.entries.length > 0) {
+          router.replace("/(tabs)/wallet");
+          return;
+        }
+        if (browsing) {
+          router.replace("/(tabs)/wallet");
+          return;
+        }
+        if (!tourPending) {
+          router.replace("/wallet-setup");
+          return;
+        }
+        if (valuePropPending) {
+          router.replace("/welcome" as never);
+          return;
+        }
+        router.replace("/onboarding-choice" as never);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [ready, router]),
+  );
 
   return <View style={styles.root} />;
 }

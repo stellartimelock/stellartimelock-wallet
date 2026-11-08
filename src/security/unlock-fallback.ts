@@ -106,7 +106,28 @@ export function checkSeedForWallet(
   input: string,
   expectedPublicKey: string | null | undefined,
   derivePublicKey: (seed: string) => string,
+  derivePhrase?: (phrase: string) => { publicKey: string; secretSeed: string },
 ): SeedCheck {
+  const trimmed = (input ?? "").trim();
+  const words = trimmed.toLowerCase().split(/\s+/).filter(Boolean);
+  const phraseShape =
+    (words.length === 12 || words.length === 24) && words.every((word) => /^[a-z]+$/.test(word));
+  if (phraseShape) {
+    if (!derivePhrase) {
+      return { ok: false, error: "Enter a secret seed or a 12- or 24-word recovery phrase." };
+    }
+    let derived: { publicKey: string; secretSeed: string };
+    try {
+      derived = derivePhrase(trimmed);
+    } catch {
+      return { ok: false, error: "That recovery phrase isn\u2019t valid. Check the words and try again." };
+    }
+    if (!expectedPublicKey) return { ok: false, error: "No active wallet found." };
+    if (derived.publicKey !== expectedPublicKey) {
+      return { ok: false, error: "That phrase does not match the active wallet. Check and try again." };
+    }
+    return { ok: true, seed: derived.secretSeed };
+  }
   const shape = seedShapeError(input);
   if (shape) return { ok: false, error: shape };
   const raw = normalizeSeedInput(input);
@@ -117,7 +138,7 @@ export function checkSeedForWallet(
   try {
     pub = derivePublicKey(raw);
   } catch {
-    return { ok: false, error: "That doesn't look like a valid Stellar secret seed." };
+    return { ok: false, error: "That doesn\u2019t look like a valid Stellar secret seed." };
   }
   if (pub !== expectedPublicKey) {
     return { ok: false, error: "Seed does not match the active wallet. Check and try again." };

@@ -9,70 +9,27 @@
 // - Stored in SecureStore (Keychain / EncryptedSharedPreferences) via `@/src/utils/storage`.
 // - Only the public key is sent to the backend.
 
-import { ed25519 } from "@noble/curves/ed25519.js";
 import * as Crypto from "expo-crypto";
 
 import { storage } from "@/src/utils/storage";
 
+import { decodeStrKey, isStellarPublicKey } from "./strkey";
 import {
-  encodeEd25519PublicKey,
-  encodeEd25519SecretSeed,
-  decodeStrKey,
-  isStellarPublicKey,
-} from "./strkey";
+  InvalidSecretSeedError,
+  keypairFromRawSeed,
+  keypairFromSecretSeed,
+  type StellarKeypair,
+} from "./secret-seed";
+
+export { InvalidSecretSeedError, keypairFromSecretSeed };
+export type { StellarKeypair };
 
 const SECRET_KEY = "xlm_vault_secret_seed";
 const PUBLIC_KEY = "xlm_vault_public_key";
 
-// SEP-0023 version byte for secret seeds. Matches strkey.ts.
-const SECRET_SEED_VERSION = 18 << 3;
-
-export interface StellarKeypair {
-  publicKey: string; // G...
-  secretSeed: string; // S...
-}
-
-export class InvalidSecretSeedError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "InvalidSecretSeedError";
-  }
-}
-
 export function generateKeypairSync(): StellarKeypair {
   const seed = Crypto.getRandomBytes(32);
-  const pub = ed25519.getPublicKey(seed);
-  return {
-    publicKey: encodeEd25519PublicKey(pub),
-    secretSeed: encodeEd25519SecretSeed(seed),
-  };
-}
-
-/**
- * Recover a keypair from a `S...` secret seed.
- * Throws `InvalidSecretSeedError` for anything that isn't a valid 56-char S-StrKey.
- */
-export function keypairFromSecretSeed(rawSecret: string): StellarKeypair {
-  const secret = (rawSecret ?? "").trim().toUpperCase();
-  if (secret.length !== 56 || !secret.startsWith("S")) {
-    throw new InvalidSecretSeedError("Secret seed must be 56 characters and start with S.");
-  }
-  let decoded;
-  try {
-    decoded = decodeStrKey(secret);
-  } catch (e) {
-    throw new InvalidSecretSeedError(
-      `Invalid secret seed: ${e instanceof Error ? e.message : String(e)}`,
-    );
-  }
-  if (decoded.version !== SECRET_SEED_VERSION) {
-    throw new InvalidSecretSeedError("Not a Stellar Ed25519 secret seed.");
-  }
-  const pub = ed25519.getPublicKey(decoded.payload);
-  return {
-    publicKey: encodeEd25519PublicKey(pub),
-    secretSeed: secret,
-  };
+  return keypairFromRawSeed(seed);
 }
 
 export async function createAndPersistKeypair(): Promise<StellarKeypair> {

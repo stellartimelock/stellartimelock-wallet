@@ -100,7 +100,7 @@ export default function WalletSetup() {
           <ChoiceCard
             testID="wallet-setup-import"
             icon="rotate-ccw"
-            title="Import an existing seed"
+            title="Restore with seed"
             body="Restore a wallet you already own using a 12- or 24-word secret recovery phrase or a raw Stellar secret key."
             onPress={() => router.push("/import")}
           />

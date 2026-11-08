@@ -53,6 +53,8 @@ export interface RestoreConfirmModalProps {
   onBackupFirst?: () => void;
   /** Optional: while true the confirm button spins/disables. */
   busy?: boolean;
+  /** One line of restore progress, shown while busy. */
+  progress?: string | null;
   /** testID prefix so playwright/testing agent can target this modal. */
   testIDPrefix?: string;
   /**
@@ -77,6 +79,7 @@ export function RestoreConfirmModal({
   onConfirm,
   onBackupFirst,
   busy,
+  progress,
   testIDPrefix = "restore-confirm",
   nonDestructive = false,
 }: RestoreConfirmModalProps) {
@@ -101,7 +104,7 @@ export function RestoreConfirmModal({
     >
       <Pressable
         style={styles.backdrop}
-        onPress={onCancel}
+        onPress={busy ? undefined : onCancel}
         testID={`${testIDPrefix}-backdrop`}
       />
         <View style={styles.sheet}>
@@ -167,9 +170,15 @@ export function RestoreConfirmModal({
           ) : null}
         </ScrollView>
 
+        {progress ? (
+          <Text style={styles.progress} testID={`${testIDPrefix}-progress`}>
+            {progress}
+          </Text>
+        ) : null}
+
         <View style={styles.actionsRow}>
           <TouchableOpacity
-            onPress={onCancel}
+            onPress={busy ? undefined : onCancel}
             style={[styles.actionBtn, styles.cancelBtn]}
             testID={`${testIDPrefix}-cancel`}
             activeOpacity={0.85}
@@ -333,6 +342,12 @@ sheet: {
     lineHeight: 18,
     fontWeight: "600",
     flex: 1,
+  },
+  progress: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    paddingHorizontal: spacing.md + 4,
+    paddingBottom: spacing.sm,
   },
   actionsRow: {
     flexDirection: "row",

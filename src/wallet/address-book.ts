@@ -149,6 +149,15 @@ async function writeAll(entries: AddressBookEntry[]): Promise<void> {
   if (!saved) throw new Error("Unable to save the address book.");
 }
 
+export async function replaceAddressBook(entries: AddressBookEntry[]): Promise<void> {
+  await acquireWriteLock();
+  try {
+    await writeAll(entries);
+  } finally {
+    releaseWriteLock();
+  }
+}
+
 export async function listEntries(
   network?: AddressBookNetwork,
 ): Promise<AddressBookEntry[]> {

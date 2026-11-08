@@ -272,6 +272,24 @@ async function writeAll(
   sessionCache = { raw: payload, entries: cloneEntries(entries) };
 }
 
+export function clearKeyManagerSession(): void {
+  sessionGeneration += 1;
+  sessionCache = null;
+  readInflight = null;
+}
+
+export async function replaceKeyEntries(
+  entries: KeyManagerEntry[],
+  opts?: { confirmShrink?: boolean },
+): Promise<void> {
+  await acquireWriteLock();
+  try {
+    await writeAll(entries, opts);
+  } finally {
+    releaseWriteLock();
+  }
+}
+
 function newId(): string {
   return `km_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -512,6 +530,7 @@ export async function removeKeyEntry(
 export async function syncKeyManagerLabelForPublicKey(
   publicKey: string,
   label: string,
+  opts?: { confirmShrink?: boolean },
 ): Promise<void> {
   const pk = (publicKey || "").trim().toUpperCase();
   const nextLabel = (label || "").trim();
@@ -530,7 +549,7 @@ export async function syncKeyManagerLabelForPublicKey(
       all[i] = { ...e, label: nextLabel, updatedAt: now };
       changed = true;
     }
-    if (changed) await writeAll(all);
+    if (changed) await writeAll(all, opts);
   } finally {
     releaseWriteLock();
   }

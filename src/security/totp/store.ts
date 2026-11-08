@@ -48,6 +48,10 @@ function newId(): string {
   return `totp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+export async function replaceTotpEntries(entries: TotpEntry[]): Promise<void> {
+  await writeAll(entries);
+}
+
 export async function listTotpEntries(): Promise<TotpEntry[]> {
   const all = await readAll();
   return all.sort((a, b) => {

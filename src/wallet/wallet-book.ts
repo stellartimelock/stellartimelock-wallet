@@ -205,7 +205,7 @@ export async function addBurnerWallet(
     const { syncKeyManagerLabelForPublicKey } = await import(
       "@/src/security/key-manager-store"
     );
-    await syncKeyManagerLabelForPublicKey(kp.publicKey, finalLabel);
+    await syncKeyManagerLabelForPublicKey(kp.publicKey, finalLabel, { confirmShrink: true });
   } catch {
     /* non-fatal */
   }
@@ -323,7 +323,7 @@ export async function addImportedWallet(
     const { syncKeyManagerLabelForPublicKey } = await import(
       "@/src/security/key-manager-store"
     );
-    await syncKeyManagerLabelForPublicKey(kp.publicKey, finalLabel);
+    await syncKeyManagerLabelForPublicKey(kp.publicKey, finalLabel, { confirmShrink: true });
   } catch {
     /* non-fatal */
   }
@@ -400,7 +400,7 @@ export async function renameWallet(id: string, label: string): Promise<string> {
     const { syncKeyManagerLabelForPublicKey } = await import(
       "@/src/security/key-manager-store"
     );
-    await syncKeyManagerLabelForPublicKey(entry.publicKey, finalLabel);
+    await syncKeyManagerLabelForPublicKey(entry.publicKey, finalLabel, { confirmShrink: true });
   } catch {
     /* non-fatal — book rename already persisted */
   }
@@ -442,7 +442,7 @@ export async function renameWalletByPublicKey(
       const { syncKeyManagerLabelForPublicKey } = await import(
         "@/src/security/key-manager-store"
       );
-      await syncKeyManagerLabelForPublicKey(pk, finalLabel);
+      await syncKeyManagerLabelForPublicKey(pk, finalLabel, { confirmShrink: true });
     } catch {
       /* non-fatal */
     }
@@ -485,12 +485,39 @@ export async function removeWallet(id: string): Promise<string | null> {
  * "Disconnect wallet" flow in Settings.
  */
 export async function clearBook(): Promise<void> {
-  const book = await loadBook();
-  for (const e of book.entries) {
-    await removeSessionSeed(e.id);
+  let entries: { id: string }[] = [];
+  try {
+    entries = (await loadBook()).entries;
+  } catch {
+    entries = [];
   }
-  setActiveWalletPublicKeyForTier(null);
-  await storage.removeItem(BOOK_KEY);
-  await storage.secureRemove("xlm_vault_wallet_secret");
-  await storage.removeItem(LEGACY_PUBLIC_KEY);
+  for (const entry of entries) {
+    try {
+      await removeSessionSeed(entry.id);
+    } catch {
+      /* A failed seed delete must not leave the book in place. */
+    }
+  }
+  try {
+    setActiveWalletPublicKeyForTier(null);
+  } catch {
+    /* non-fatal */
+  }
+  try {
+    await storage.removeItem(BOOK_KEY);
+  } catch {
+    /* non-fatal */
+  }
+  try {
+    await storage.secureRemove("xlm_vault_wallet_secret");
+  } catch {
+    /* non-fatal */
+  }
+  try {
+    await storage.removeItem(LEGACY_PUBLIC_KEY);
+  } catch {
+    /* non-fatal */
+  }
+  const { releaseSessionAfterDisconnect } = await import("@/src/security/session-keystore");
+  releaseSessionAfterDisconnect();
 }

@@ -19,7 +19,25 @@ export type RestoreTone = "info" | "error";
 
 export type ClassifiedBackup =
   | { kind: "wallet-backup"; payload: string }
+  | { kind: "plaintext-envelope"; plaintext: string }
   | { kind: "not-wallet"; message: string };
+
+const WALLET_FORMATS = new Set([
+  FILE_FORMAT,
+  "stellar_timelock_backup",
+  "xlm-vault-backup",
+  "stellar-timelock-vault",
+]);
+
+function looksLikePlainEnvelope(value: Record<string, unknown>): boolean {
+  return (
+    Array.isArray(value.addresses) ||
+    Array.isArray(value.totp) ||
+    Array.isArray(value.keyManager) ||
+    Array.isArray(value.walletMeta) ||
+    (typeof value.device === "string" && (Array.isArray(value.notes) || Array.isArray(value.bills)))
+  );
+}
 
 function shownName(fileName: string): string {
   const cleaned = fileName.replace(/[\u0000\r\n]/g, " ").trim() || "that file";
@@ -99,8 +117,18 @@ export function classifyPickedBackup(fileName: string, raw: string): ClassifiedB
     }
   }
 
-  if (parsedOk && isRecord(parsed) && parsed.format === FILE_FORMAT && typeof parsed.payload === "string") {
-    return { kind: "wallet-backup", payload: parsed.payload };
+  if (parsedOk && isRecord(parsed) && typeof parsed.format === "string" && WALLET_FORMATS.has(parsed.format)) {
+    if (typeof parsed.payload === "string") {
+      return { kind: "wallet-backup", payload: parsed.payload };
+    }
+    // Older writers stored the envelope object instead of a ciphertext string.
+    if (isRecord(parsed.payload) || Array.isArray(parsed.payload)) {
+      return { kind: "plaintext-envelope", plaintext: JSON.stringify(parsed.payload) };
+    }
+  }
+
+  if (parsedOk && isRecord(parsed) && looksLikePlainEnvelope(parsed)) {
+    return { kind: "plaintext-envelope", plaintext: text };
   }
 
   if (parsedOk && Array.isArray(parsed)) {
@@ -128,12 +156,19 @@ export async function openClassifiedBackup(
   | { ok: false; tone: RestoreTone; error: string }
 > {
   const classified = classifyPickedBackup(fileName, raw);
+  if (classified.kind === "plaintext-envelope") {
+    return { ok: true, plaintext: classified.plaintext };
+  }
   if (classified.kind !== "wallet-backup") {
     return { ok: false, tone: "info", error: classified.message };
   }
   const payload = normalizeBackupCiphertext(classified.payload);
   const format = detectEncryptedFormat(payload);
   if (format == null) {
+    const trimmed = payload.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      return { ok: true, plaintext: trimmed };
+    }
     return { ok: false, tone: "info", error: decryptFailedMessage(fileName, null) };
   }
   let plaintext = "";

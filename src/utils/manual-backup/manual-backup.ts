@@ -22,8 +22,15 @@ import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
 import { Linking, Platform } from "react-native";
 
-import { encrypt, decrypt } from "@/src/security/crypto";
+import { decryptBackupAsync } from "@/src/security/backup-crypto";
+import { encrypt } from "@/src/security/crypto";
 import { openClassifiedBackup, type RestoreTone } from "@/src/utils/manual-backup/classify-picked-file";
+import {
+  BACKUP_FOLDER_PROMPT,
+  backupAppDirectory,
+  shouldPromptForBackupFolder,
+} from "@/src/utils/manual-backup/backup-location";
+import { readTextOrExplain, unreadableFileMessage, withTimeout } from "@/src/utils/manual-backup/read-backup-text";
 import { planSaveReplace } from "@/src/utils/save-compat";
 import { storage } from "@/src/utils/storage";
 import { SaveOverwriteDeclined, protectedWrite } from "@/src/utils/protected-save";
@@ -46,6 +53,7 @@ export {
 import { MANUAL_BACKUP_EXT, OS_SAVE_EXT, OS_SAVE_APP_NAME, stemFromFileName } from "./os-save-path";
 const SAF_DIR_URI_KEY = "xlm_vault_manual_backup_saf_dir_v1";
 const LAST_BACKUP_KEY = "xlm_vault_manual_backup_last_v1";
+const BACKUP_FOLDER_PROMPTED_KEY = "xlm_vault_backup_folder_prompted_v1";
 
 /** Metadata for the most recent successful export (used by overwrite). */
 export interface LastBackupMeta {
@@ -369,6 +377,72 @@ function fromB64(s: string): string {
   return Buffer.from(s, "base64").toString("utf-8");
 }
 
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    const info = await withTimeout(FileSystem.getInfoAsync(path), 8_000);
+    return !!info?.exists;
+  } catch {
+    return false;
+  }
+}
+
+/** Automatic copy under `StellarTimeLock backups/<app>/`. A failure does not undo the main file. */
+async function writeAppBackupCopy(baseDir: string, fileName: string, contents: string): Promise<void> {
+  try {
+    const directory = backupAppDirectory(baseDir, OS_SAVE_APP_NAME);
+    await FileSystem.makeDirectoryAsync(directory, { intermediates: true }).catch(() => undefined);
+    const path = `${directory}/${fileName}`;
+    const exists = await pathExists(path);
+    if (exists) {
+      const previous = await readTextOrExplain(fileName, () =>
+        FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.UTF8 }),
+      );
+      if (!previous.ok) return;
+      const plan = planSaveReplace({
+        targetExists: true,
+        previous: previous.raw,
+        next: contents,
+      });
+      if (!plan.replace) return;
+      await FileSystem.copyAsync({ from: path, to: `${path}.bak` }).catch(() => undefined);
+    }
+    await FileSystem.writeAsStringAsync(path, contents, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+  } catch {
+    /* advisory */
+  }
+}
+
+/**
+ * True once, when neither the new backup folder nor the old OS/SAF
+ * location can be opened. The UI shows one prompt and then remembers.
+ */
+export async function backupFolderPromptNeeded(): Promise<{ prompt: boolean; message: string }> {
+  if (Platform.OS === "web") return { prompt: false, message: BACKUP_FOLDER_PROMPT };
+  const alreadyPrompted = await storage.getItem<boolean>(BACKUP_FOLDER_PROMPTED_KEY, false);
+  const base = FileSystem.documentDirectory ?? "";
+  const prefix = base.endsWith("/") ? base : `${base}/`;
+  const saf = await getSavedSafDirUri();
+  const [newFolderExists, oldFolderExists, safExists] = await Promise.all([
+    base ? pathExists(backupAppDirectory(base, OS_SAVE_APP_NAME)) : Promise.resolve(false),
+    base ? pathExists(`${prefix}OS/${OS_SAVE_APP_NAME}`) : Promise.resolve(false),
+    saf ? pathExists(saf) : Promise.resolve(false),
+  ]);
+  return {
+    prompt: shouldPromptForBackupFolder({
+      newFolderExists,
+      oldPathExists: oldFolderExists || safExists,
+      alreadyPrompted: !!alreadyPrompted,
+    }),
+    message: BACKUP_FOLDER_PROMPT,
+  };
+}
+
+export async function markBackupFolderPrompted(): Promise<void> {
+  await storage.setItem(BACKUP_FOLDER_PROMPTED_KEY, true);
+}
+
 interface ExportOptions {
   /**
    * When true (default) AND the platform is Android, prompts the SAF
@@ -387,6 +461,7 @@ interface ExportOptions {
  * Serialise the current local state to an encrypted `.stvault` file
  * saved to persistent locations:
  *   • Always: `documentDirectory/stellar-timelock-backup-<ts>.stvault`
+ *   • Always: `documentDirectory/StellarTimeLock backups/StellarTimeLock/<file>`
  *   • Android + SAF grant: the user-picked folder (visible in Files app)
  *   • Web: real browser download via Blob
  *
@@ -506,6 +581,7 @@ export async function exportManualBackup(
     // Also write a `.os` copy under OS/StellarTimeLock/ per STL_CORE SaveFolder
     // convention. This write is advisory — failures do not abort the export.
     await writeOsSave(dir, stemFromFileName(fileName), contents);
+    await writeAppBackupCopy(dir, fileName, contents);
 
     let externalUri: string | undefined;
     let externalLabel: string | undefined;
@@ -794,28 +870,32 @@ export async function pickManualBackupFile(): Promise<
       return { ok: false, error: "Import cancelled." };
     }
     const asset = res.assets[0];
-    let raw = "";
+    const fileName = asset.name || "backup.stvault";
+    let read: { ok: true; raw: string } | { ok: false; error: string };
     if (Platform.OS === "web") {
-      try {
-        if (asset.file) {
-          raw = await asset.file.text();
-        } else {
-          const resp = await fetch(asset.uri);
-          raw = await resp.text();
-        }
-      } catch {
-        return { ok: false, error: "Couldn't read the picked file." };
-      }
-    } else {
-      raw = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: FileSystem.EncodingType.UTF8,
+      read = await readTextOrExplain(fileName, async () => {
+        if (asset.file) return asset.file.text();
+        const resp = await fetch(asset.uri);
+        if (!resp.ok) throw new Error("missing");
+        return resp.text();
       });
+    } else {
+      if (!asset.uri.startsWith("content:")) {
+        const exists = await pathExists(asset.uri);
+        if (!exists) return { ok: false, error: unreadableFileMessage(fileName) };
+      }
+      read = await readTextOrExplain(fileName, () =>
+        FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        }),
+      );
     }
+    if (!read.ok) return { ok: false, error: read.error };
     return {
       ok: true,
       file: {
-        fileName: asset.name || "backup.stvault",
-        raw,
+        fileName,
+        raw: read.raw,
       },
     };
   } catch (e) {
@@ -827,13 +907,20 @@ export async function restoreManualBackupPayload(
   secretSeed: string,
   raw: string,
   fileName = "backup",
+  hooks?: { onProgress?: (message: string) => void },
 ): Promise<ImportResult> {
+  const report = (message: string) => {
+    try {
+      hooks?.onProgress?.(message);
+    } catch {
+      /* progress is advisory */
+    }
+  };
   try {
-    // The S… seed already in RAM. Not a Key Manager key, not a PIN, and
-    // not the biometric wrapping key. v2 files from 1.0–1.6.3 used
-    // CryptoJS's default PBKDF2 (SHA-256). A failed open does not write
-    // or delete anything.
-    const opened = await openClassifiedBackup(fileName, raw, secretSeed, decrypt);
+    report("Opening backup…");
+    // Yielding decrypt. v3 is 100,000 PBKDF2 rounds; the sync opener
+    // froze the screen on a large file. A failed open does not write.
+    const opened = await openClassifiedBackup(fileName, raw, secretSeed, decryptBackupAsync);
     if (!opened.ok) {
       return { ok: false, error: opened.error, tone: opened.tone };
     }
@@ -849,22 +936,33 @@ export async function restoreManualBackupPayload(
       };
     }
 
-    const applied = await applyEnvelope(env);
+    const applied = await applyEnvelope(env, { onProgress: report });
+    if (applied.error) {
+      return { ok: false, tone: "error", error: applied.error, applied };
+    }
+    report("Restore finished.");
     return { ok: true, applied };
   } catch (e) {
     return {
       ok: false,
       tone: "error",
-      error: e instanceof Error ? e.message : String(e),
+      error: e instanceof Error ? e.message : "Couldn\u2019t restore that backup.",
     };
   }
 }
 
-/** Pick a backup and restore it in one call (seed-import path). */
-export async function importManualBackup(secretSeed: string): Promise<ImportResult> {
+export async function importManualBackup(
+  secretSeed: string,
+  hooks?: { onProgress?: (message: string) => void },
+): Promise<ImportResult> {
+  try {
+    hooks?.onProgress?.("Reading backup…");
+  } catch {
+    /* progress is advisory */
+  }
   const picked = await pickManualBackupFile();
   if (!picked.ok) return { ok: false, error: picked.error };
-  return restoreManualBackupPayload(secretSeed, picked.file.raw, picked.file.fileName);
+  return restoreManualBackupPayload(secretSeed, picked.file.raw, picked.file.fileName, hooks);
 }
 
 // Encode helpers are exported so unit tests / dev scripts can round-trip

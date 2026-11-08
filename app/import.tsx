@@ -37,17 +37,17 @@ import {
   getCurrentTier,
   hydrateTier,
 } from "@/src/tiers/tier-config";
-import { importManualBackup } from "@/src/utils/manual-backup/manual-backup";
+import { importManualBackup, backupFolderPromptNeeded, markBackupFolderPrompted, pickAndroidSaveFolder } from "@/src/utils/manual-backup/manual-backup";
+import { withTimeout } from "@/src/utils/manual-backup/read-backup-text";
+import { accountFromRestoreInput } from "@/src/wallet/restore-seed";
 import {
   InvalidMnemonicError,
   isValidMnemonic,
-  keypairFromMnemonic,
   looksLikeMnemonic,
   normalizeMnemonic,
 } from "@/src/wallet/seed-phrase";
 import {
   InvalidSecretSeedError,
-  keypairFromSecretSeed,
   shortenAddress,
 } from "@/src/wallet/stellar";
 
@@ -58,6 +58,8 @@ export default function Import() {
   const { setWallet, addImportedWallet, refreshWallets, setCurrency } = useSession();
 
   const [seed, setSeed] = useState("");
+  const [inputError, setInputError] = useState<string | null>(null);
+  const [derivedAddress, setDerivedAddress] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [previewAddress, setPreviewAddress] = useState<string | null>(null);
   // After seed import succeeds, offer optional .stvault restore before
@@ -65,6 +67,8 @@ export default function Import() {
   // backup envelope (same seed that just unlocked the wallet).
   const [restorePromptVisible, setRestorePromptVisible] = useState(false);
   const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreProgress, setRestoreProgress] = useState<string | null>(null);
+  const [folderPrompt, setFolderPrompt] = useState<string | null>(null);
   const restoreSecretRef = useRef<string | null>(null);
   // Second prompt: import additional wallets already stored in Key Manager.
   const [kmImportVisible, setKmImportVisible] = useState(false);
@@ -104,18 +108,24 @@ export default function Import() {
   useEffect(() => {
     if (!looksValid) {
       setRecognized(false);
+      setDerivedAddress(null);
       return;
     }
     let cancelled = false;
     (async () => {
       try {
-        const kp = isPhrase
-          ? keypairFromMnemonic(trimmed)
-          : keypairFromSecretSeed(cleanSeed);
+        const parsed = accountFromRestoreInput(trimmed);
+        if (cancelled) return;
+        if (!parsed.ok) {
+          setDerivedAddress(null);
+          setRecognized(false);
+          return;
+        }
+        setDerivedAddress(parsed.account.publicKey);
         const { suggestLabelForPublicKey } = await import(
           "@/src/wallet/wallet-book"
         );
-        const found = await suggestLabelForPublicKey(kp.publicKey);
+        const found = await suggestLabelForPublicKey(parsed.account.publicKey);
         if (cancelled) return;
         if (found) {
           setRecognized(true);
@@ -159,36 +169,28 @@ export default function Import() {
 
   const handleImport = async () => {
     if (busy) return;
-    if (!looksValid) {
-      toast.show(
-        isPhrase
-          ? "Enter a valid 12- or 24-word recovery phrase."
-          : "Secret seed must be 56 chars and start with S.",
-        "error",
-      );
+    const parsed = accountFromRestoreInput(seed);
+    if (!parsed.ok) {
+      setInputError(parsed.error);
+      toast.show(parsed.error, "error");
       return;
     }
 
     let createdMetaId: string | null = null;
     let wasAlreadyImported = false;
     const requestedNickname = nickname.trim();
-    let mnemonicToStore: string | null = null;
-    let secretForImport = cleanSeed;
+    const mnemonicToStore = parsed.account.mnemonic ?? null;
+    const secretForImport = parsed.account.secretSeed;
     try {
       setBusy(true);
-      if (isPhrase) {
-        const mnemonic = normalizeMnemonic(trimmed);
-        const derived = keypairFromMnemonic(mnemonic);
-        secretForImport = derived.secretSeed;
-        mnemonicToStore = mnemonic;
-      }
+      setInputError(null);
       // Same wallet-book path as raw S… import — phrase only supplies the secret.
       const { meta, wasAlreadyImported: dup, autoMatchedLabel } = await addImportedWallet(
         requestedNickname,
         secretForImport,
       );
       if (mnemonicToStore) {
-        await setWalletMnemonic(meta.id, mnemonicToStore);
+        await withTimeout(setWalletMnemonic(meta.id, mnemonicToStore), 8_000).catch(() => false);
       }
       createdMetaId = dup ? null : meta.id; // only roll back fresh entries
       wasAlreadyImported = dup;
@@ -255,11 +257,11 @@ export default function Import() {
       }
       const msg =
         e instanceof InvalidMnemonicError
-          ? "That doesn't look like a valid recovery phrase. Check the words and try again."
+          ? "That recovery phrase isn\u2019t valid. Check the words and try again."
           : e instanceof InvalidSecretSeedError
-          ? "That doesn't look like a valid Stellar secret seed. Double-check the 56-character key (starts with S) from your other wallet."
-          : "Couldn't import that wallet. Please try again.";
-      console.warn("[Import] wallet import failed:", e);
+          ? "Enter a 12- or 24-word recovery phrase, or a 56-character secret seed that starts with S."
+          : "Couldn\u2019t restore that wallet. Check the seed and try again.";
+      setInputError(msg);
       toast.show(msg, "error");
     } finally {
       setBusy(false);
@@ -334,16 +336,16 @@ export default function Import() {
     void afterRestoreStep();
   };
 
-  const onImportBackup = async () => {
-    if (restoreBusy) return;
+  const runBackupImport = async () => {
     const secret = restoreSecretRef.current;
     if (!secret) {
       void afterRestoreStep();
       return;
     }
     setRestoreBusy(true);
+    setRestoreProgress("Reading backup…");
     try {
-      const r = await importManualBackup(secret);
+      const r = await importManualBackup(secret, { onProgress: setRestoreProgress });
       if (r.ok && r.applied) {
         if (r.applied.currency) await setCurrency(r.applied.currency).catch(() => undefined);
         await refreshWallets().catch(() => undefined);
@@ -363,7 +365,30 @@ export default function Import() {
       }
     } finally {
       setRestoreBusy(false);
+      setRestoreProgress(null);
     }
+  };
+
+  const onImportBackup = async () => {
+    if (restoreBusy) return;
+    const secret = restoreSecretRef.current;
+    if (!secret) {
+      void afterRestoreStep();
+      return;
+    }
+    const gate = await backupFolderPromptNeeded().catch(() => ({ prompt: false, message: "" }));
+    if (gate.prompt) {
+      setFolderPrompt(gate.message);
+      return;
+    }
+    await runBackupImport();
+  };
+
+  const dismissFolderPrompt = async (choose: boolean) => {
+    setFolderPrompt(null);
+    await markBackupFolderPrompted().catch(() => undefined);
+    if (choose) await pickAndroidSaveFolder().catch(() => undefined);
+    await runBackupImport();
   };
 
   const onSkipKmImport = () => {
@@ -450,7 +475,7 @@ export default function Import() {
         }
         await finishKmImport(imported, skipped, selected.length);
       } catch (e) {
-        console.warn("[Import] Key Manager wallet import failed:", e);
+        console.warn("[Import] Key Manager wallet import failed");
         toast.show("Couldn't import Key Manager wallets. Please try again.", "error");
       } finally {
         setKmImportBusy(false);
@@ -481,7 +506,7 @@ export default function Import() {
         }
         await finishKmImport(imported, 0, kmCandidates.length);
       } catch (e) {
-        console.warn("[Import] Key Manager wallet import failed:", e);
+        console.warn("[Import] Key Manager wallet import failed");
         toast.show("Couldn't import Key Manager wallets. Please try again.", "error");
       } finally {
         setKmImportBusy(false);
@@ -581,7 +606,10 @@ export default function Import() {
         <TextInput
           testID="import-secret-input"
           value={seed}
-          onChangeText={setSeed}
+          onChangeText={(value) => {
+            setSeed(value);
+            setInputError(null);
+          }}
           placeholder="S… secret seed, or 12/24-word recovery phrase"
           placeholderTextColor={colors.textTertiary}
           autoCapitalize={isPhrase ? "none" : "characters"}
@@ -611,6 +639,16 @@ export default function Import() {
               : `${cleanSeed.length}/56`}
           </Text>
         </View>
+        {inputError ? (
+          <Text style={styles.inputError} testID="import-seed-error">
+            {inputError}
+          </Text>
+        ) : null}
+        {derivedAddress ? (
+          <Text style={styles.hint} testID="import-derived-address">
+            Account {shortenAddress(derivedAddress, 8, 6)}
+          </Text>
+        ) : null}
 
         <View style={styles.labelRow}>
           <Text style={styles.label}>WALLET NAME</Text>
@@ -663,7 +701,7 @@ export default function Import() {
           label="Restore wallet"
           icon="check"
           onPress={handleImport}
-          disabled={!looksValid}
+          disabled={busy || trimmed.length === 0}
           loading={busy}
         />
       </KeyboardAwareScrollView>
@@ -704,7 +742,12 @@ export default function Import() {
               accessibilityRole="button"
             >
               {restoreBusy ? (
-                <ActivityIndicator color={colors.textInverse} />
+                <>
+                  <ActivityIndicator color={colors.textInverse} />
+                  {restoreProgress ? (
+                    <Text style={styles.restorePrimaryText}>{restoreProgress}</Text>
+                  ) : null}
+                </>
               ) : (
                 <>
                   <Feather name="upload" size={14} color={colors.textInverse} />
@@ -721,6 +764,41 @@ export default function Import() {
               accessibilityRole="button"
             >
               <Text style={styles.restoreSkipText}>Skip</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={folderPrompt != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          void dismissFolderPrompt(false);
+        }}
+        testID="import-backup-folder-prompt"
+      >
+        <View style={styles.restoreRoot}>
+          <View style={styles.restoreCard}>
+            <Text style={styles.restoreTitle}>Backup folder</Text>
+            <Text style={styles.restoreBody}>{folderPrompt}</Text>
+            <TouchableOpacity
+              style={styles.restorePrimaryBtn}
+              onPress={() => {
+                void dismissFolderPrompt(true);
+              }}
+              testID="import-backup-folder-choose"
+            >
+              <Text style={styles.restorePrimaryText}>Choose folder</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.restoreSkipBtn}
+              onPress={() => {
+                void dismissFolderPrompt(false);
+              }}
+              testID="import-backup-folder-dismiss"
+            >
+              <Text style={styles.restoreSkipText}>Not now</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -990,6 +1068,7 @@ const styles = StyleSheet.create({
 
   warnRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   warnText: { color: colors.textSecondary, flex: 1, fontSize: 13, lineHeight: 18 },
+  inputError: { color: colors.danger, fontSize: 13, marginTop: 8, lineHeight: 18 },
 
   compatHeader: {
     flexDirection: "row",
