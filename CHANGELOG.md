@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.22 (versionCode 33)
+- Unlock with "Use seed instead" now accepts a 12- or 24-word recovery phrase as well as the 56-character secret seed. A phrase becomes the Stellar account at m/44'/148'/0' (SEP-0005). The phrase or seed must open the locked wallet's public address or it is refused. A bad phrase shows an error. The seed stays in memory only.
+
 ## 1.6.21 (versionCode 32)
 - Restoring a backup finishes instead of stopping halfway. A large file shows progress. A file that cannot be read shows a plain error. Older backups that omit the wrapper or the version still open. Automatic copies are saved under StellarTimeLock backups/StellarTimeLock/. If the old folder is gone, the app asks once to point at the StellarTimeLock backups folder.
 - Disconnect clears the wallet, including the in-memory seed and the encrypted-data cache, so Restore with seed can run. A recovery phrase is checked and turned into the Stellar account at m/44'/148'/0' (SEP-0005). That account opens the encrypted data on the phone. A bad phrase or seed shows an error.
