@@ -95,9 +95,14 @@ export function normalizeSeedInput(input: string): string {
 
 /** Shape-only check, before any key derivation. Null when the shape is fine. */
 export function seedShapeError(input: string): string | null {
+  const trimmed = (input ?? "").trim();
+  const words = trimmed.toLowerCase().split(/\s+/).filter(Boolean);
+  const phraseShape =
+    (words.length === 12 || words.length === 24) && words.every((word) => /^[a-z]+$/.test(word));
+  if (phraseShape) return null;
   const raw = normalizeSeedInput(input);
   if (!raw || !raw.startsWith("S") || raw.length !== 56) {
-    return "Enter the 56-character Stellar secret seed (starts with S).";
+    return "Enter a 12- or 24-word recovery phrase, or the 56-character Stellar secret seed (starts with S).";
   }
   return null;
 }

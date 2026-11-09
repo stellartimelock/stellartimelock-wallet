@@ -87,6 +87,18 @@ describe("1.6.17 unlock fallback", () => {
     assert.match(seedShapeError("") ?? "", /56-character/);
   });
 
+  it("seed shape accepts a 12- or 24-word recovery phrase as well as an S-secret", () => {
+    const phrase12 = Array(12).fill("alpha").join(" ");
+    const phrase24 = Array(24).fill("bravo").join(" ");
+    assert.equal(seedShapeError(phrase12), null);
+    assert.equal(seedShapeError(phrase24), null);
+    assert.equal(seedShapeError(phrase12.toUpperCase()), null);
+    assert.notEqual(seedShapeError("alpha alpha"), null);
+    const wallet = Keypair.random();
+    assert.equal(seedShapeError(wallet.secret()), null);
+    assert.match(seedShapeError("SHORT") ?? "", /recovery phrase/);
+  });
+
   it("the helper never touches storage", () => {
     const src = readFileSync("src/security/unlock-fallback.ts", "utf8");
     assert.doesNotMatch(src, /^import /m);
@@ -104,6 +116,7 @@ describe("1.6.17 unlock fallback", () => {
     assert.match(gate, /biometric-gate-retry-/);
     assert.match(gate, /biometric-gate-fallback-message-/);
     assert.match(gate, /checkSeedForWallet\(\s*seedInput,\s*entry\.publicKey/);
+    assert.match(gate, /keypairFromMnemonic\(phrase\)/);
     assert.match(gate, /warmSessionFromVerifiedSeed\(book\.activeId, checked\.seed\)/);
     assert.doesNotMatch(gate, /secureSet|storage\.setItem|SecureStore\./);
   });
