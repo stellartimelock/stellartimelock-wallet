@@ -13,6 +13,7 @@ import { openClassifiedBackup } from "../src/utils/manual-backup/classify-picked
 import { readTextOrExplain, unreadableFileMessage } from "../src/utils/manual-backup/read-backup-text.ts";
 import {
   coercedEnvelopeVersion,
+  keysFromRestoredWallets,
   mergeRestoredAddresses,
   mergeRestoredKeys,
   mergeRestoredTotp,
@@ -146,6 +147,45 @@ describe("backup restore finishes", () => {
     assert.equal(keys?.length, 1);
   });
 
+  it("puts every backup wallet into Key Manager, even when it was not a saved key", () => {
+    const savedPub = "GC3MMSXBWHL6CPOAVERSJITX7BH76YU252WGLUOM5CJX3E7UCYZBTPJQ";
+    const savedSeed = "SAEWIVK3VLNEJ3WEJRZXQGDAS5NVG2BYSYDFRSH4GKVTS5RXNVED5AX7";
+    const existing = mergeRestoredKeys([], [
+      {
+        id: "k1",
+        label: "Old name",
+        secretSeed: savedSeed,
+        publicAddress: savedPub,
+        createdAt: 1,
+      },
+    ]);
+    assert.ok(existing);
+    const wallets = [
+      { id: "w_travel", label: "Travel", publicKey: G, createdAt: 2 },
+      { id: "w_cold", label: "Cold storage", publicKey: savedPub, createdAt: 3, updatedAt: 10 },
+    ];
+    const merged = keysFromRestoredWallets(existing ?? [], wallets);
+    assert.equal(merged.length, 2);
+    const travel = merged.find((row) => row.publicAddress === G);
+    assert.equal(travel?.watchOnly, true);
+    assert.equal(travel?.secretSeed, "");
+    assert.equal(travel?.label, "Travel");
+    assert.equal(travel?.id, "km_wallet_w_travel");
+    const cold = merged.find((row) => row.publicAddress === savedPub);
+    assert.equal(cold?.id, "k1");
+    assert.equal(cold?.label, "Cold storage");
+    assert.equal(cold?.secretSeed, savedSeed);
+    assert.notEqual(cold?.watchOnly, true);
+
+    const signed = keysFromRestoredWallets([], [
+      { id: "w_cold", label: "Cold storage", publicKey: savedPub, createdAt: 1 },
+    ], { [savedPub]: savedSeed });
+    assert.equal(signed.length, 1);
+    assert.equal(signed[0]?.watchOnly, undefined);
+    assert.equal(signed[0]?.secretSeed, savedSeed);
+    assert.equal(signed[0]?.publicAddress, savedPub);
+  });
+
   it("keeps restore from deleting files and shows progress in the source", () => {
     const source = readFileSync("src/utils/manual-backup/manual-backup.ts", "utf8");
     const card = readFileSync("src/utils/manual-backup/ManualBackupCard.tsx", "utf8");
@@ -154,6 +194,8 @@ describe("backup restore finishes", () => {
     assert.match(source, /readTextOrExplain/);
     assert.match(card, /manual-backup-progress/);
     assert.match(card, /manual-backup-folder-prompt/);
+    const envelope = readFileSync("src/utils/backup-envelope.ts", "utf8");
+    assert.match(envelope, /keysFromRestoredWallets/);
     assert.doesNotMatch(
       source.slice(source.indexOf("export async function restoreManualBackupPayload")),
       /deleteAsync|unlink/,

@@ -236,3 +236,41 @@ export function applyWalletLabelsToKeys<K extends RestoreKey>(keys: K[], wallets
     return { ...key, label: wallet.label, updatedAt: Math.max(walletTs, keyTs) };
   });
 }
+
+/**
+ * Put every wallet from the backup into the Key Manager list.
+ * A matching saved key keeps its secret and picks up the newer nickname.
+ * A wallet with no saved key is added: signing if `secretsByPublicKey`
+ * has its S… seed (usually still on the phone), otherwise watch-only.
+ * The backup file itself does not carry wallet-book seeds.
+ */
+export function keysFromRestoredWallets(
+  keys: RestoreKey[],
+  wallets: RestoreWallet[] | undefined,
+  secretsByPublicKey: Record<string, string> = {},
+): RestoreKey[] {
+  if (!Array.isArray(wallets) || wallets.length === 0) return keys;
+  const labeled = applyWalletLabelsToKeys(keys, wallets);
+  const have = new Set(labeled.map((key) => key.publicAddress.toUpperCase()));
+  const extra: RestoreKey[] = [];
+  for (const wallet of wallets) {
+    const publicAddress = (wallet.publicKey ?? "").trim().toUpperCase();
+    if (!STELLAR_G.test(publicAddress) || have.has(publicAddress)) continue;
+    const label = (wallet.label ?? "").trim().slice(0, 48);
+    if (!label) continue;
+    const secret = (secretsByPublicKey[publicAddress] ?? "").trim().toUpperCase();
+    const canSign = STELLAR_S.test(secret);
+    extra.push({
+      id: `km_wallet_${wallet.id || publicAddress}`,
+      label,
+      chain: "stellar",
+      watchOnly: canSign ? undefined : true,
+      secretSeed: canSign ? secret : "",
+      publicAddress,
+      createdAt: wallet.createdAt ?? 0,
+      updatedAt: wallet.updatedAt ?? wallet.createdAt ?? 0,
+    });
+    have.add(publicAddress);
+  }
+  return extra.length ? [...labeled, ...extra] : labeled;
+}

@@ -12,6 +12,9 @@
 // The active wallet secret seed / key material is NEVER included in
 // the envelope — it lives in SecureStore independently. Key Manager
 // entries are user-curated extras and ARE included in the backup.
+// Restore also adds each wallet nickname from the backup to Key Manager.
+// If that wallet's seed is still on the phone, the entry can sign;
+// otherwise it is watch-only (name and public address).
 //
 // When the envelope is at rest on disk (the .stvault / .os file), it is
 // AES-256 encrypted via src/security/crypto.ts. The key comes from the
@@ -40,6 +43,7 @@ import {
   applyWalletLabelsToKeys,
   coercedEnvelopeVersion,
   envelopeHasWalletFields,
+  keysFromRestoredWallets,
   mergeRestoredAddresses,
   mergeRestoredKeys,
   mergeRestoredTotp,
@@ -231,6 +235,45 @@ export function isSupportedEnvelopeVersion(v: unknown): v is BackupEnvelope["v"]
   return v === 1 || v === 2 || v === 3 || v === 4 || v === 5 || v === 6 || v === 7 || v === 8;
 }
 
+
+async function secretsByPublicKeyForWallets(
+  wallets: WalletMeta[],
+): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const wanted = new Set(
+    wallets.map((wallet) => (wallet.publicKey ?? "").trim().toUpperCase()).filter(Boolean),
+  );
+  if (wanted.size === 0) return out;
+  try {
+    const book = await loadBook();
+    const { getWalletSeed } = await import("@/src/security/session-keystore");
+    for (const entry of book.entries) {
+      const publicKey = (entry.publicKey ?? "").trim().toUpperCase();
+      if (!wanted.has(publicKey) || out[publicKey]) continue;
+      try {
+        const seed = await getWalletSeed(entry.id);
+        if (seed) out[publicKey] = seed;
+      } catch {
+        /* skip a missing local seed */
+      }
+    }
+  } catch {
+    /* book or keystore unavailable */
+  }
+  try {
+    const { unlockedWalletSeed } = await import("@/src/security/session-keystore");
+    const unlocked = unlockedWalletSeed();
+    if (unlocked) {
+      const { keypairFromSecretSeed } = await import("@/src/wallet/stellar");
+      const publicKey = keypairFromSecretSeed(unlocked).publicKey.toUpperCase();
+      if (wanted.has(publicKey) && !out[publicKey]) out[publicKey] = unlocked;
+    }
+  } catch {
+    /* session seed unavailable */
+  }
+  return out;
+}
+
 export async function applyEnvelope(
   env: BackupEnvelope,
   hooks?: { onProgress?: (message: string) => void },
@@ -328,17 +371,27 @@ export async function applyEnvelope(
 
   report("Restoring saved keys…");
   let keysCount: number | undefined;
-  if (Array.isArray(env.keyManager)) {
+  const keySectionPresent = Array.isArray(env.keyManager);
+  const backupWallets = Array.isArray(env.walletMeta) ? env.walletMeta : [];
+  if (keySectionPresent || backupWallets.length > 0) {
     try {
       const localKeys = await listKeyEntries();
-      let merged = mergeRestoredKeys(localKeys as RestoreKey[], env.keyManager as RestoreKey[]);
-      if (merged && labeledBook) {
-        merged = applyWalletLabelsToKeys(merged, labeledBook as RestoreWallet[]);
-      }
+      let merged: RestoreKey[] | null = keySectionPresent
+        ? mergeRestoredKeys(localKeys as RestoreKey[], env.keyManager as RestoreKey[])
+        : (localKeys as RestoreKey[]);
       if (merged) {
+        if (backupWallets.length > 0) {
+          merged = keysFromRestoredWallets(
+            merged,
+            backupWallets as RestoreWallet[],
+            await secretsByPublicKeyForWallets(backupWallets),
+          );
+        } else if (labeledBook) {
+          merged = applyWalletLabelsToKeys(merged, labeledBook as RestoreWallet[]);
+        }
         await replaceKeyEntries(merged as KeyManagerEntry[], { confirmShrink: true });
+        keysCount = merged.length;
       }
-      keysCount = merged?.length ?? env.keyManager.length;
     } catch {
       problems.push("Couldn\u2019t save keys.");
       keysCount = 0;
