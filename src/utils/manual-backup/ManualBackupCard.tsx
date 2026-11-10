@@ -91,6 +91,7 @@ export function ManualBackupCard() {
   const [pendingRestore, setPendingRestore] = useState<PickedBackup | null>(null);
   const [restoreProgress, setRestoreProgress] = useState<string | null>(null);
   const [exportProgress, setExportProgress] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [folderPrompt, setFolderPrompt] = useState<string | null>(null);
   const [overwritePrompt, setOverwritePrompt] = useState<LastBackupMeta | null>(
     null,
@@ -106,10 +107,13 @@ export function ManualBackupCard() {
   const runExport = useCallback(
     async (overwrite: boolean) => {
       if (!wallet?.secretSeed) {
-        toast.show(noSeedMessage(wallet), "error");
+        const msg = noSeedMessage(wallet);
+        setExportError(msg);
+        toast.show(msg, "error");
         return;
       }
       setBusy("export");
+      setExportError(null);
       setExportProgress("Preparing backup…");
       setOverwritePrompt(null);
       try {
@@ -134,13 +138,26 @@ export function ManualBackupCard() {
           });
           setConfirm(r);
           // Refresh the folder label (user may have picked a folder mid-export).
-          setPickedFolderLabel(await getCurrentAndroidSaveFolderLabel());
+          try {
+            setPickedFolderLabel(await getCurrentAndroidSaveFolderLabel());
+          } catch {
+            // Label is cosmetic; the file is already saved.
+          }
           trackEvent({ name: "backup_synced", target: "manual_json", ok: true });
-          if (r.warning) toast.show(r.warning, "error");
+          if (r.warning) {
+            setExportError(r.warning);
+            toast.show(r.warning, "error");
+          }
         } else {
-          toast.show(r.error ?? "Export failed.", "error");
+          const msg = r.error ?? "Export failed.";
+          setExportError(msg);
+          toast.show(msg, "error");
           trackEvent({ name: "backup_synced", target: "manual_json", ok: false });
         }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Export failed.";
+        setExportError(msg);
+        toast.show(msg, "error");
       } finally {
         setBusy(null);
         setExportProgress(null);
@@ -371,6 +388,11 @@ export function ManualBackupCard() {
           {exportProgress}
         </Text>
       ) : null}
+      {exportError ? (
+        <Text style={styles.footnote} testID="manual-backup-export-error">
+          {exportError}
+        </Text>
+      ) : null}
       {restoreProgress && busy === "import" && !importConfirmVisible ? (
         <Text style={styles.footnote} testID="manual-backup-progress">
           {restoreProgress}
@@ -417,8 +439,17 @@ export function ManualBackupCard() {
                 });
                 if (rr.ok) {
                   setConfirm(rr);
-                  if (rr.warning) toast.show(rr.warning, "error");
-                } else toast.show(rr.error ?? "Re-export failed.", "error");
+                  if (rr.warning) {
+                    setExportError(rr.warning);
+                    toast.show(rr.warning, "error");
+                  } else {
+                    setExportError(null);
+                  }
+                } else {
+                  const msg = rr.error ?? "Re-export failed.";
+                  setExportError(msg);
+                  toast.show(msg, "error");
+                }
               } else if (!r.ok) {
                 toast.show(r.error ?? "Couldn\u2019t open location.", "error");
               }
@@ -447,8 +478,14 @@ export function ManualBackupCard() {
                 toast.show("Saved another copy.", "success");
                 if (r.warning) toast.show(r.warning, "error");
               } else {
-                toast.show(r.error ?? "Export failed.", "error");
+                const msg = r.error ?? "Export failed.";
+                setExportError(msg);
+                toast.show(msg, "error");
               }
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : "Export failed.";
+              setExportError(msg);
+              toast.show(msg, "error");
             } finally {
               setBusy(null);
               setExportProgress(null);
