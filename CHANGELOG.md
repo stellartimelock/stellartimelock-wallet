@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.24 (versionCode 35)
+- Backup export always ends with a saved file or a lasting error on the Backup card, not only a short toast that can disappear. Encryption prefers the device's native PBKDF2 (Web Crypto) and otherwise a faster library path, so "Encrypting backup…" should finish in seconds instead of minutes on a slow emulator. If encryption or the folder write still takes too long, the timeout message stays on screen.
+
 ## 1.6.23 (versionCode 34)
 - Exporting a backup finishes instead of looking frozen. Encryption uses the same yielding method as restore, so the app can show progress ("Encrypting backup…", "Saving backup…", "Writing to selected folder…"). If encryption or the folder write takes too long, the app stops and shows a clear error instead of spinning forever. Try a plain folder name such as Documents/STLBackup if the selected folder cannot be written.
 

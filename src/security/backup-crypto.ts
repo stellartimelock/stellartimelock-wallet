@@ -15,6 +15,9 @@
 // v1 and v2 now try SHA-256 first, then SHA-1. New files are v3.
 
 import CryptoJS from "crypto-js";
+import { sha1 as nobleSha1 } from "@noble/hashes/legacy.js";
+import { pbkdf2Async as noblePbkdf2Async } from "@noble/hashes/pbkdf2.js";
+import { sha256 as nobleSha256 } from "@noble/hashes/sha2.js";
 
 import { utf8ToMutableBytes, wipeBytes, wipeWordArray } from "@/src/security/secure-wipe";
 
@@ -66,11 +69,11 @@ function pbkdf2(
 }
 
 /**
- * How many PBKDF2 iterations run before the JS thread yields.
- * CryptoJS.PBKDF2 is synchronous. 100,000 SHA-256 rounds on the JS
- * thread is what froze the first launch after an upgrade.
+ * How many PBKDF2 iterations run before the JS thread yields, used
+ * only by the CryptoJS fallback. Native Web Crypto and noble hashes
+ * are preferred; this chunk is large so a fallback still finishes.
  */
-export const PBKDF2_YIELD_EVERY = 2_000;
+export const PBKDF2_YIELD_EVERY = 20_000;
 
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => {
@@ -78,10 +81,50 @@ function yieldToEventLoop(): Promise<void> {
   });
 }
 
+function wordArrayToBytes(wa: CryptoJS.lib.WordArray): Uint8Array {
+  const bytes = new Uint8Array(wa.sigBytes);
+  for (let i = 0; i < wa.sigBytes; i++) {
+    bytes[i] = ((wa.words[i >>> 2] ?? 0) >>> (24 - (i % 4) * 8)) & 0xff;
+  }
+  return bytes;
+}
+
+/**
+ * RFC 2898 PBKDF2 via `crypto.subtle` when the runtime provides it
+ * (web, recent Node, some native engines). Same bytes as CryptoJS.
+ */
+async function pbkdf2WebCrypto(
+  password: Uint8Array,
+  salt: Uint8Array,
+  iterations: number,
+  keyBytes: number,
+  sha256: boolean,
+): Promise<Uint8Array | null> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle?.importKey || !subtle.deriveBits) return null;
+  try {
+    const key = await subtle.importKey("raw", password, "PBKDF2", false, ["deriveBits"]);
+    const bits = await subtle.deriveBits(
+      {
+        name: "PBKDF2",
+        hash: sha256 ? "SHA-256" : "SHA-1",
+        salt,
+        iterations,
+      },
+      key,
+      keyBytes * 8,
+    );
+    return new Uint8Array(bits);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Same bytes as CryptoJS.PBKDF2 (HMAC loop: U1 = HMAC(salt || block),
- * then Ui = HMAC(U{i-1}), XOR into the block). Yields every
- * PBKDF2_YIELD_EVERY iterations so taps and the price fetch can run.
+ * then Ui = HMAC(U{i-1}), XOR into the block). Prefers native Web
+ * Crypto, then noble hashes (already in the app), then a yielding
+ * CryptoJS fallback so a missing native path cannot freeze the UI.
  */
 export async function pbkdf2Async(
   password: CryptoJS.lib.WordArray,
@@ -90,6 +133,30 @@ export async function pbkdf2Async(
   keyBytes: number,
   sha256: boolean,
 ): Promise<CryptoJS.lib.WordArray> {
+  const passwordBytes = wordArrayToBytes(password);
+  const saltBytes = wordArrayToBytes(salt);
+  try {
+    const native = await pbkdf2WebCrypto(
+      passwordBytes,
+      saltBytes,
+      iterations,
+      keyBytes,
+      sha256,
+    );
+    if (native) return wordsFromBytes(native);
+    const out = await noblePbkdf2Async(sha256 ? nobleSha256 : nobleSha1, passwordBytes, saltBytes, {
+      c: iterations,
+      dkLen: keyBytes,
+      asyncTick: 16,
+    });
+    return wordsFromBytes(out);
+  } catch {
+    // Fall through to the CryptoJS loop if noble/webcrypto throws.
+  } finally {
+    wipeBytes(passwordBytes);
+    wipeBytes(saltBytes);
+  }
+
   const hasher = sha256 ? CryptoJS.algo.SHA256 : CryptoJS.algo.SHA1;
   const hmac = CryptoJS.algo.HMAC.create(hasher, password);
   const derivedKey = CryptoJS.lib.WordArray.create();
