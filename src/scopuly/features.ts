@@ -39,8 +39,10 @@ export const SCOPULY_FEATURES: ScopulyFeature[] = [
 ];
 
 export const SCOPULY_X_URL = "https://x.com/scopuly";
+/** Official Android package id from Scopuly's Google Play listing. */
+export const SCOPULY_ANDROID_PACKAGE = "com.sdex.app";
 export const SCOPULY_PLAY_URL =
-  "https://play.google.com/store/apps/details?id=com.sdex.app";
+  `https://play.google.com/store/apps/details?id=${SCOPULY_ANDROID_PACKAGE}`;
 /** Android Play Store listing. The https URL is the fallback when market:// cannot open. */
-export const SCOPULY_PLAY_MARKET = "market://details?id=com.sdex.app";
+export const SCOPULY_PLAY_MARKET = `market://details?id=${SCOPULY_ANDROID_PACKAGE}`;
 export const SCOPULY_LOGO_SOURCE = "https://scopuly.com/img/logo/icon.png";

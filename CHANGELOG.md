@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.25 (versionCode 36)
+- "Open Scopuly with my address" still copies the public address, then launches the Scopuly app. If Scopuly is not installed, it opens the Play listing instead. The Home row now says "Explore Scopuly". The SEP-7 vault handoff stays off.
+
 ## 1.6.24 (versionCode 35)
 - Backup export always ends with a saved file or a lasting error on the Backup card, not only a short toast that can disappear. Encryption prefers the device's native PBKDF2 (Web Crypto) and otherwise a faster library path, so "Encrypting backup…" should finish in seconds instead of minutes on a slow emulator. If encryption or the folder write still takes too long, the timeout message stays on screen.
 
