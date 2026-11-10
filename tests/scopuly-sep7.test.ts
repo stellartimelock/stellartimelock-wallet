@@ -13,11 +13,13 @@ import {
 
 import { constantTimeEqual } from "../src/scopuly/constant-time.ts";
 import {
+  SCOPULY_ANDROID_PACKAGE,
   SCOPULY_FEATURES,
   SCOPULY_PLAY_MARKET,
   SCOPULY_PLAY_URL,
   SCOPULY_X_URL,
 } from "../src/scopuly/features.ts";
+import { scopulyLaunchIntentUri } from "../src/scopuly/launch-intent.ts";
 import {
   SCOPULY_SEP7_HANDOFF_ENABLED,
   VAULT_WITHDRAW_REQUIRES_SCOPULY,
@@ -116,7 +118,11 @@ describe("Scopuly SEP-7 handoff", () => {
     assert.match(playFn, /SCOPULY_PLAY_URL/);
     const addressFn = screen.slice(addressStart, screen.indexOf("return ("));
     assert.match(addressFn, /Clipboard\.setStringAsync/);
-    assert.doesNotMatch(addressFn, /SCOPULY_PLAY/);
+    assert.match(addressFn, /openScopulyApp/);
+    assert.match(addressFn, /Address copied, opening Scopuly/);
+    assert.match(addressFn, /try \{/);
+    assert.match(addressFn, /catch \{/);
+    assert.doesNotMatch(addressFn, /web\+stellar:pay|scopuly:\/\//);
     assert.match(screen, /scopuly-open-with-address/);
     assert.match(screen, /scopuly-open-play/);
     assert.match(screen, /playHit: \{[\s\S]*width: 140,[\s\S]*height: 54/);
@@ -125,6 +131,7 @@ describe("Scopuly SEP-7 handoff", () => {
 
   it("links only the Play listing and X, with no token or yield copy", () => {
     assert.equal(SCOPULY_X_URL, "https://x.com/scopuly");
+    assert.equal(SCOPULY_ANDROID_PACKAGE, "com.sdex.app");
     assert.equal(
       SCOPULY_PLAY_URL,
       "https://play.google.com/store/apps/details?id=com.sdex.app",
@@ -132,6 +139,24 @@ describe("Scopuly SEP-7 handoff", () => {
     assert.equal(SCOPULY_PLAY_MARKET, "market://details?id=com.sdex.app");
     const copy = SCOPULY_FEATURES.map((item) => `${item.title} ${item.detail}`).join("\n");
     assert.doesNotMatch(copy, /\bSCOP\b|yield|web wallet|scopuly\.com/i);
+  });
+
+  it("builds a package launch intent and falls back to the Play listing", () => {
+    const uri = scopulyLaunchIntentUri();
+    assert.equal(
+      uri,
+      "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.sdex.app;end",
+    );
+    assert.throws(() => scopulyLaunchIntentUri("not a package"));
+    const opener = readFileSync("src/scopuly/open-app.ts", "utf8");
+    assert.match(opener, /SCOPULY_PLAY_MARKET/);
+    assert.match(opener, /SCOPULY_PLAY_URL/);
+    assert.doesNotMatch(opener, /web\+stellar:pay|buildWebStellarTxUri|prepareScopulyRequest/);
+    const manifest = readFileSync("android/app/src/main/AndroidManifest.xml", "utf8");
+    assert.match(manifest, /<package android:name="com\.sdex\.app"\s*\/>/);
+    const home = readFileSync("app/(tabs)/wallet.tsx", "utf8");
+    assert.match(home, /Explore Scopuly/);
+    assert.doesNotMatch(home, /Connect this wallet/);
   });
 
   it("builds a web+stellar:tx link and refuses callback, origin_domain, and seeds", () => {

@@ -11,6 +11,7 @@ import {
   SCOPULY_PLAY_URL,
   SCOPULY_X_URL,
 } from "@/src/scopuly/features";
+import { openScopulyApp } from "@/src/scopuly/open-app";
 import { useSession } from "@/src/state/session";
 import { colors, radii, spacing, typography } from "@/src/theme";
 
@@ -35,8 +36,13 @@ export default function ScopulyScreen() {
       toast.show("Open a wallet first. Your secret key stays here.", "info");
       return;
     }
-    await Clipboard.setStringAsync(wallet.publicKey);
-    toast.show("Public address copied. Your secret key stays here.", "info");
+    try {
+      await Clipboard.setStringAsync(wallet.publicKey);
+      toast.show("Address copied, opening Scopuly", "info");
+      await openScopulyApp();
+    } catch {
+      toast.show("Address copied. Could not open Scopuly.", "info");
+    }
   };
 
   return (

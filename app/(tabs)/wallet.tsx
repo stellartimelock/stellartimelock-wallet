@@ -538,7 +538,7 @@ function ScopulyRow() {
       activeOpacity={0.8}
       testID="wallet-scopuly-row"
       accessibilityRole="button"
-      accessibilityLabel="Scopuly. Connect this wallet."
+      accessibilityLabel="Scopuly. Explore Scopuly."
     >
       <Image
         source={require("@/assets/brand/scopuly.png")}
@@ -548,7 +548,7 @@ function ScopulyRow() {
       />
       <View style={styles.scopulyCopy}>
         <Text style={styles.keyButtonLabel}>Scopuly</Text>
-        <Text style={styles.keyButtonSub}>Connect this wallet</Text>
+        <Text style={styles.keyButtonSub}>Explore Scopuly</Text>
       </View>
       <Feather name="chevron-right" size={16} color={colors.textTertiary} />
     </TouchableOpacity>
