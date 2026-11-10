@@ -122,8 +122,8 @@ android {
         applicationId 'com.stellartimelock'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 33
-        versionName "1.6.22"
+        versionCode 34
+        versionName "1.6.23"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
         if (stlVerifyTestnet) {

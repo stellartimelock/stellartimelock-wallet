@@ -10,7 +10,7 @@ import * as Crypto from "expo-crypto";
 import {
   decryptBackupAsync,
   detectEncryptedFormat,
-  encryptV3,
+  encryptV3Async,
   isEncryptedPayload,
 } from "@/src/security/backup-crypto";
 
@@ -19,7 +19,7 @@ export { detectEncryptedFormat, isEncryptedPayload };
 export async function encrypt(plaintext: string, secretSeed: string): Promise<string> {
   const iv = await Crypto.getRandomBytesAsync(16);
   const salt = await Crypto.getRandomBytesAsync(16);
-  return encryptV3(plaintext, secretSeed, iv, salt);
+  return encryptV3Async(plaintext, secretSeed, iv, salt);
 }
 
 /**

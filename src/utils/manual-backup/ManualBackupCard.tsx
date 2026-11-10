@@ -90,6 +90,7 @@ export function ManualBackupCard() {
   const [importConfirmVisible, setImportConfirmVisible] = useState(false);
   const [pendingRestore, setPendingRestore] = useState<PickedBackup | null>(null);
   const [restoreProgress, setRestoreProgress] = useState<string | null>(null);
+  const [exportProgress, setExportProgress] = useState<string | null>(null);
   const [folderPrompt, setFolderPrompt] = useState<string | null>(null);
   const [overwritePrompt, setOverwritePrompt] = useState<LastBackupMeta | null>(
     null,
@@ -109,6 +110,7 @@ export function ManualBackupCard() {
         return;
       }
       setBusy("export");
+      setExportProgress("Preparing backup…");
       setOverwritePrompt(null);
       try {
         const r = await exportManualBackup(wallet.secretSeed, {
@@ -116,6 +118,7 @@ export function ManualBackupCard() {
           // Manual exports are always interactive for the first SAF
           // folder pick; overwrite still reuses the prior file URI.
           interactive: true,
+          onProgress: setExportProgress,
         });
         if (r.ok) {
           setLastResult({
@@ -133,12 +136,14 @@ export function ManualBackupCard() {
           // Refresh the folder label (user may have picked a folder mid-export).
           setPickedFolderLabel(await getCurrentAndroidSaveFolderLabel());
           trackEvent({ name: "backup_synced", target: "manual_json", ok: true });
+          if (r.warning) toast.show(r.warning, "error");
         } else {
           toast.show(r.error ?? "Export failed.", "error");
           trackEvent({ name: "backup_synced", target: "manual_json", ok: false });
         }
       } finally {
         setBusy(null);
+        setExportProgress(null);
       }
     },
     [toast, wallet],
@@ -361,6 +366,11 @@ export function ManualBackupCard() {
         </Text>
       )}
 
+      {exportProgress && busy === "export" ? (
+        <Text style={styles.footnote} testID="manual-backup-export-progress">
+          {exportProgress}
+        </Text>
+      ) : null}
       {restoreProgress && busy === "import" && !importConfirmVisible ? (
         <Text style={styles.footnote} testID="manual-backup-progress">
           {restoreProgress}
@@ -401,9 +411,14 @@ export function ManualBackupCard() {
                   "Folder chosen \u2014 saving a fresh copy in it now",
                   "success",
                 );
-                const rr = await exportManualBackup(wallet?.secretSeed!, { interactive: false });
-                if (rr.ok) setConfirm(rr);
-                else toast.show(rr.error ?? "Re-export failed.", "error");
+                const rr = await exportManualBackup(wallet?.secretSeed!, {
+                  interactive: false,
+                  onProgress: setExportProgress,
+                });
+                if (rr.ok) {
+                  setConfirm(rr);
+                  if (rr.warning) toast.show(rr.warning, "error");
+                } else toast.show(rr.error ?? "Re-export failed.", "error");
               } else if (!r.ok) {
                 toast.show(r.error ?? "Couldn\u2019t open location.", "error");
               }
@@ -425,15 +440,18 @@ export function ManualBackupCard() {
             try {
               const r = await exportManualBackup(wallet?.secretSeed!, {
                 interactive: false,
+                onProgress: setExportProgress,
               });
               if (r.ok) {
                 setConfirm(r);
                 toast.show("Saved another copy.", "success");
+                if (r.warning) toast.show(r.warning, "error");
               } else {
                 toast.show(r.error ?? "Export failed.", "error");
               }
             } finally {
               setBusy(null);
+              setExportProgress(null);
             }
           }}
         />

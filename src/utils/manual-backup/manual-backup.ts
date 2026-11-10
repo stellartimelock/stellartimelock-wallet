@@ -56,6 +56,28 @@ const LAST_BACKUP_KEY = "xlm_vault_manual_backup_last_v1";
 const BACKUP_FOLDER_PROMPTED_KEY = "xlm_vault_backup_folder_prompted_v1";
 
 /** Metadata for the most recent successful export (used by overwrite). */
+
+/** Wall-clock cap for the 100,000-round v3 KDF on export. */
+export const EXPORT_ENCRYPT_TIMEOUT_MS = 180_000;
+/** Cap for a stuck Android SAF create/write. */
+export const EXPORT_SAF_WRITE_TIMEOUT_MS = 30_000;
+export const EXPORT_ENCRYPT_TIMEOUT_MESSAGE =
+  "Backup encryption took too long and was stopped. Unlock the wallet and try again.";
+export const EXPORT_FOLDER_WRITE_TIMEOUT_MESSAGE =
+  "Could not write the backup to the selected folder in time. Try a different folder (for example Documents/STLBackup), then export again.";
+export const EXPORT_FOLDER_WRITE_FAILED_MESSAGE =
+  "Could not write the backup to the selected folder. Try a different folder (for example Documents/STLBackup), then export again.";
+
+async function withExportTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
+  try {
+    return await withTimeout(work, ms);
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e);
+    if (raw === "timed out") throw new Error(message);
+    throw e;
+  }
+}
+
 export interface LastBackupMeta {
   fileName: string;
   documentUri: string;
@@ -107,6 +129,11 @@ export interface ExportResult {
    */
   homeLayout?: number;
   error?: string;
+  /**
+   * Non-fatal: the in-app save worked, but writing to the chosen
+   * folder failed or timed out.
+   */
+  warning?: string;
 }
 
 export interface ImportResult {
@@ -455,6 +482,7 @@ interface ExportOptions {
    * still writable) instead of creating a new timestamped file.
    */
   overwrite?: boolean;
+  onProgress?: (message: string) => void;
 }
 
 /**
@@ -474,9 +502,22 @@ export async function exportManualBackup(
 ): Promise<ExportResult> {
   const interactive = opts.interactive ?? true;
   const overwrite = opts.overwrite ?? false;
+  const report = (message: string) => {
+    try {
+      opts.onProgress?.(message);
+    } catch {
+      // A UI hook must not fail the export.
+    }
+  };
   try {
+    report("Preparing backup…");
     const env = await buildEnvelope();
-    const ciphertext = await encrypt(JSON.stringify(env), secretSeed);
+    report("Encrypting backup…");
+    const ciphertext = await withExportTimeout(
+      encrypt(JSON.stringify(env), secretSeed),
+      EXPORT_ENCRYPT_TIMEOUT_MS,
+      EXPORT_ENCRYPT_TIMEOUT_MESSAGE,
+    );
     const file: ExportedFile = {
       format: "stellar-timelock-backup",
       v: 1,
@@ -574,6 +615,7 @@ export async function exportManualBackup(
     if (!docPlan.replace) {
       throw new Error("The new save is shorter, so the existing file was left unchanged.");
     }
+    report("Saving backup…");
     await FileSystem.writeAsStringAsync(documentUri, contents, {
       encoding: FileSystem.EncodingType.UTF8,
     });
@@ -585,25 +627,44 @@ export async function exportManualBackup(
 
     let externalUri: string | undefined;
     let externalLabel: string | undefined;
+    let warning: string | undefined;
     if (Platform.OS === "android") {
+      report("Writing to selected folder…");
       const dirUri = await ensureSafDirUri(interactive);
       if (dirUri) {
-        const written = await writeSafFile(
-          dirUri,
-          fileName,
-          contents,
-          overwrite ? last?.externalUri : undefined,
-        );
+        let written: string | null = null;
+        try {
+          written = await withExportTimeout(
+            writeSafFile(
+              dirUri,
+              fileName,
+              contents,
+              overwrite ? last?.externalUri : undefined,
+            ),
+            EXPORT_SAF_WRITE_TIMEOUT_MS,
+            EXPORT_FOLDER_WRITE_TIMEOUT_MESSAGE,
+          );
+          if (!written && overwrite && last?.externalUri) {
+            // Prior SAF file gone — create a new one with the same name.
+            written = await withExportTimeout(
+              writeSafFile(dirUri, fileName, contents),
+              EXPORT_SAF_WRITE_TIMEOUT_MS,
+              EXPORT_FOLDER_WRITE_TIMEOUT_MESSAGE,
+            );
+          }
+        } catch (e) {
+          const raw = e instanceof Error ? e.message : String(e);
+          warning =
+            raw === EXPORT_FOLDER_WRITE_TIMEOUT_MESSAGE
+              ? EXPORT_FOLDER_WRITE_TIMEOUT_MESSAGE
+              : EXPORT_FOLDER_WRITE_FAILED_MESSAGE;
+          written = null;
+        }
         if (written) {
           externalUri = written;
           externalLabel = labelForSafUri(dirUri) ?? "Selected folder";
-        } else if (overwrite && last?.externalUri) {
-          // Prior SAF file gone — create a new one with the same name.
-          const recreated = await writeSafFile(dirUri, fileName, contents);
-          if (recreated) {
-            externalUri = recreated;
-            externalLabel = labelForSafUri(dirUri) ?? "Selected folder";
-          }
+        } else if (!warning) {
+          warning = EXPORT_FOLDER_WRITE_FAILED_MESSAGE;
         }
       }
     }
@@ -635,6 +696,7 @@ export async function exportManualBackup(
       keys: (env.keyManager ?? []).length,
       wallets: (env.walletMeta ?? []).length,
       homeLayout: env.prefs?.homeLayout?.length,
+      ...(warning ? { warning } : {}),
     };
   } catch (e) {
     return {

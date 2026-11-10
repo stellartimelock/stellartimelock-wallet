@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.23 (versionCode 34)
+- Exporting a backup finishes instead of looking frozen. Encryption uses the same yielding method as restore, so the app can show progress ("Encrypting backup…", "Saving backup…", "Writing to selected folder…"). If encryption or the folder write takes too long, the app stops and shows a clear error instead of spinning forever. Try a plain folder name such as Documents/STLBackup if the selected folder cannot be written.
+
 ## 1.6.22 (versionCode 33)
 - Unlock with "Use seed instead" now accepts a 12- or 24-word recovery phrase as well as the 56-character secret seed. A phrase becomes the Stellar account at m/44'/148'/0' (SEP-0005). The phrase or seed must open the locked wallet's public address or it is refused. A bad phrase shows an error. The seed stays in memory only.
 
